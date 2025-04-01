@@ -1,0 +1,1 @@
+updated version of GrabAndSqueeze media utilities server for ServiceMedia platform, used for image resizing, file conversions, etc.
