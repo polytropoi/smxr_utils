@@ -19,6 +19,8 @@ import validator from "validator";
 // import minio from "minio";
 import helmet from "helmet";
 
+import sharp from "sharp";
+
 
 import bcrypt from "bcryptjs"; //just drop in replacement ?!? ok then
 
@@ -583,7 +585,7 @@ export async function ListObjects(bucket, prefix) {
         }
       }
 }
-export async function GetObject(bucket, key) {
+export async function GetObject(bucket, key, type) {
 
     try {
         const response = await s3.send(
@@ -592,10 +594,16 @@ export async function GetObject(bucket, key) {
             Key: key,
           }),
         );
-        // The Body object also has 'transformToByteArray' and 'transformToWebStream' methods.
-        const str = await response.Body.transformToString();
-        // console.log(str);
-        return str;
+        if (type && type == "binary") {
+            const bytes = await response.Body.transformToByteArray();
+            console.log("bytes length " + bytes.length);
+            return bytes
+        } else {
+            // The Body object also has 'transformToByteArray' and 'transformToWebStream' methods.
+            const str = await response.Body.transformToString();
+            // console.log(str);
+            return str;
+        }
       } catch (caught) {
         if (caught instanceof NoSuchKey) {
           console.error(
@@ -1142,71 +1150,273 @@ app.post('/process_video_hls_local', requiredAuthentication, function (req, res)
     let fullpath = req.body.fullpath;
 
    console.log("tryna encode local file " + req.body.fullpath); 
-            (async () => {
-                try {
-                    if (!busy) {    
-                        const fileExists = await exists(fullpath);
-                        if (!fileExists){
-                            console.log("that file doesn't exist!");   
-                        }//exists is deprecated, existSync doesn't work w/ promise version..
-                        if (!req.session.user || process.env.LOCAL_TEMP_FOLDER == undefined && process.env.LOCAL_TEMP_FOLDER == "") {
-                            console.log("temp folders not found!");
-                        } else {
-                            busy = true;
-                            var ts = Math.round(Date.now() / 1000);
-                            let downloadpath = path.dirname(fullpath) + "/";  //set local folder
-                            let filename = path.basename(fullpath); // set local filename (*.mp4)                
-                            
-                            var stats = fs.stat(fullpath)
-                            var fileSizeInBytes = stats.size;
-                            // Convert the file size to megabytes (optional)
-                            var fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
-                            const updoc = {
-                                userID : req.session.user._id.toString(),
-                                username : req.session.user.userName,
-                                title : ts + "." + filename,
-                                filename : filename,
-                                item_type : 'video',
-                                tags: [],
-                                item_status: "private",
-                                otimestamp : ts,
-                                ofilesize : fileSizeInMegabytes};
-                            //insert vid first to get the id used for paths below
-                            console.log("tryna save hls to " + downloadpath + " filename " + filename + " size " + fileSizeInMegabytes );
-                            
-                            const response = await ffmpegPromise_hls360(fullpath, downloadpath);
-                            console.log("hls encoding result " +JSON.stringify(response));
-
-                            const video_item = await RunDataQuery("video_items", "insertOne", updoc);
-                            console.log("inserted video item, uploading next...")
-                            const files = await fs.readdir(downloadpath);
-                            for (const file of files) {
-                                console.log("tryna read file " + downloadpath + file);
-                                if (path.extname(file) == '.ts') {   
-                                    const theFile = await fs.readFile(downloadpath + file);
-                                    const status = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + updoc.userID + "/video/" + video_item.insertedId +"/hls/" + file, theFile, 'video/MP2T');
-                                    // console.log("upload status " + status.size);
-                                } else if (path.extname(file) == '.m3u8') {
-                                    const theFile = await fs.readFile(downloadpath + file);
-                                    const status = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + updoc.userID + "/video/" + video_item.insertedId +"/hls/" + file, theFile, 'application/x-mpegURL');
-                                    // console.log("upload status " + status.size);
-                                }
-                            }
-                            busy = false;
-                            res.send ("done!!");
-                            console.log("Done!@ :)") ;  
-                        }
+    (async () => {
+        try {
+            if (!busy) {    
+                const fileExists = await exists(fullpath);
+                if (!fileExists){
+                    console.log("that file doesn't exist!");   
+                }//exists is deprecated, existSync doesn't work w/ promise version..
+                if (!req.session.user || process.env.LOCAL_TEMP_FOLDER == undefined && process.env.LOCAL_TEMP_FOLDER == "") {
+                    console.log("temp folders not found!");
+                } else {
+                    busy = true;
+                    var ts = Math.round(Date.now() / 1000);
+                    let downloadpath = path.dirname(fullpath) + "/";  //set local folder
+                    let filename = path.basename(fullpath); // set local filename (*.mp4)                
                     
-                    } else {
-                        console.log("busy at the moment, give us a shake..");
+                    var stats = fs.stat(fullpath)
+                    var fileSizeInBytes = stats.size;
+                    // Convert the file size to megabytes (optional)
+                    var fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
+                    const updoc = {
+                        userID : req.session.user._id.toString(),
+                        username : req.session.user.userName,
+                        title : ts + "." + filename,
+                        filename : filename,
+                        item_type : 'video',
+                        tags: [],
+                        item_status: "private",
+                        otimestamp : ts,
+                        ofilesize : fileSizeInMegabytes};
+                    //insert vid first to get the id used for paths below
+                    console.log("tryna save hls to " + downloadpath + " filename " + filename + " size " + fileSizeInMegabytes );
+                    
+                    const response = await ffmpegPromise_hls360(fullpath, downloadpath);
+                    console.log("hls encoding result " +JSON.stringify(response));
+
+                    const video_item = await RunDataQuery("video_items", "insertOne", updoc);
+                    console.log("inserted video item, uploading next...")
+                    const files = await fs.readdir(downloadpath);
+                    for (const file of files) {
+                        console.log("tryna read file " + downloadpath + file);
+                        if (path.extname(file) == '.ts') {   
+                            const theFile = await fs.readFile(downloadpath + file);
+                            const status = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + updoc.userID + "/video/" + video_item.insertedId +"/hls/" + file, theFile, 'video/MP2T');
+                            // console.log("upload status " + status.size);
+                        } else if (path.extname(file) == '.m3u8') {
+                            const theFile = await fs.readFile(downloadpath + file);
+                            const status = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + updoc.userID + "/video/" + video_item.insertedId +"/hls/" + file, theFile, 'application/x-mpegURL');
+                            // console.log("upload status " + status.size);
+                        }
                     }
-                } catch (e) {
-                    console.log("error projessing hls local " + e);
                     busy = false;
-                    res.send("error projessing hls local " + e);
+                    res.send ("done!!");
+                    console.log("Done!@ :)") ;  
                 }
-            })(); //end async   
-        // }
-    // }
-     
+            
+            } else {
+                console.log("busy at the moment, give us a shake..");
+            }
+        } catch (e) {
+            console.log("error projessing hls local " + e);
+            busy = false;
+            res.send("error projessing hls local " + e);
+        }
+    })(); //end async   
 });
+
+
+app.get('/resize_uploaded_picture/:_id', requiredAuthentication, function (req, res) { //presumes original pic has already been uploaded to production folder and db entry made
+    console.log("tryna resize pic with key: " + req.params._id);
+    
+
+    (async () => { 
+        try {
+            var o_id = ObjectId.createFromHexString(req.params._id);
+            const query = {"_id": o_id};
+            let image = await RunDataQuery("image_items", "findOne", query);
+            console.log("gotsa image from db " + image._id);
+            let oKey = "users/" + image.userID + "/pictures/originals/" + image._id +".original."+image.filename;
+            // var params = {Bucket: process.env.ROOT_BUCKET_NAME, Key: oKey};
+            let extension = getExtension(image.filename).toLowerCase();
+            let contentType = 'image/jpeg';
+            let format = 'jpg';
+            if (extension == ".PNG" || extension == ".png") {
+                contentType = 'image/png';
+                format = 'png';
+            } 
+            let bytes = await GetObject(process.env.ROOT_BUCKET_NAME, oKey, "binary"); //get the original pic
+            console.log("gots data with format " + format + "key : users/" + image.userID + "/pictures/originals/" + image._id +".original."+image.filename);
+            // const byteArray = await response.Body.transformToByteArray();
+            const buffer = Buffer.from(bytes);
+            // console.log("gotsa buffer with length " + byteArray.length);
+            if (format == 'jpg') {
+                const buff1 = await sharp(buffer)
+                .resize({
+                kernel: sharp.kernel.nearest,
+                height: 1024,
+                width: 1024,
+                fit: 'contain'
+                })
+                .extend({
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: { r: 0, g: 0, b: 0, alpha: 1 }
+                })
+                .toFormat(format)
+                .toBuffer();
+
+                // console.log("tryna put standard to key : users/" + image.userID + "/pictures/" + image._id +".standard."+image.filename );
+                let key1 = "users/" + image.userID + "/pictures/" + image._id +".standard."+image.filename;
+                const putstatus_1 = await PutObject(process.env.ROOT_BUCKET_NAME, key1, buff1, contentType); 
+                console.log("putstatus 1 " + JSON.stringify(putstatus_1));
+
+                const buff2 = await sharp(buffer)
+                .resize({
+                kernel: sharp.kernel.nearest,
+                height: 512,
+                width: 512,
+                fit: 'contain'
+                })
+                .extend({
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: { r: 0, g: 0, b: 0, alpha: 1 }
+                })
+                .toFormat(format)
+                .toBuffer();
+                
+                let key2 = "users/" + image.userID + "/pictures/" + image._id +".standard."+image.filename;
+                const putstatus_2 = await PutObject(process.env.ROOT_BUCKET_NAME, key2, buff2, contentType); 
+                console.log("putstatus 2 " + JSON.stringify(putstatus_2));
+
+                const buff3 = await sharp(buffer)
+                .resize({
+                kernel: sharp.kernel.nearest,
+                height: 128,
+                width: 128,
+                fit: 'contain'
+                })
+                .extend({
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                background: { r: 0, g: 0, b: 0, alpha: 1 }
+                })
+                .toFormat(format)
+                .toBuffer();
+                
+                let key3 = "users/" + image.userID + "/pictures/" + image._id +".thumb."+image.filename;
+                const putstatus_3 = await PutObject(process.env.ROOT_BUCKET_NAME, key3, buff3, contentType); 
+                console.log("putstatus 2 " + JSON.stringify(putstatus_3));
+                console.log("Done resizng jpg!");
+            }
+        } catch (e) {
+
+        }
+
+        // } else { //if png, keep bg transparent
+        // console.log("format != jpg");
+        // await sharp(data.Body)
+        // .resize({
+        // kernel: sharp.kernel.nearest,
+        // height: 1024,
+        // width: 1024,
+        // fit: 'contain',
+        // background: { r: 0, g: 0, b: 0, alpha: 0 }
+        // })
+        // .toFormat(format)
+        // .toBuffer()
+        // .then(rdata => {
+            
+        // })
+        // .catch(err => {console.log(err); res.send(err);});
+        // const putstatus = await PutObject({
+        //     Bucket: process.env.ROOT_BUCKET_NAME,
+        //     Key: "users/" + image.userID + "/pictures/" + image._id +".standard."+image.filename,
+        //     Body: rdata,
+        //     ContentType: contentType
+        //     });
+
+        // await sharp(data.Body)
+        // .resize({
+        // kernel: sharp.kernel.nearest,
+        // height: 512,
+        // width: 512,
+        // fit: 'contain',
+        // ackground: { r: 0, g: 0, b: 0, alpha: 0 }
+        // })
+        // .toFormat(format)
+        // .toBuffer()
+        // .then(rdata => {
+        // s3.putObject({
+        //     Bucket: process.env.ROOT_BUCKET_NAME,
+        //     Key: "users/" + image.userID + "/pictures/" + image._id +".half."+image.filename,
+        //     Body: rdata,
+        //     ContentType: contentType
+        //     }, function (error, resp) {
+        //     if (error) {
+        //         console.log('error putting  pic' + error);
+        //     } else {
+        //         console.log('Successfully uploaded  pic with response: ' + resp);
+        //     }
+        // })
+        // })
+        // .catch(err => {console.log(err); res.send(err);});
+        // await sharp(data.Body)
+        // .resize({
+        // kernel: sharp.kernel.nearest,
+        // height: 256,
+        // width: 256,
+        // fit: 'contain',
+        // background: { r: 0, g: 0, b: 0, alpha: 0 }
+        // })
+        // .toFormat(format)
+        // .toBuffer()
+        // .then(rdata => {
+        // // let buf = Buffer.from(rdata);
+        // // let encodedData = rdata.toString('base64');
+        // s3.putObject({
+        //     Bucket: process.env.ROOT_BUCKET_NAME,
+        //     Key: "users/" + image.userID + "/pictures/" + image._id +".quarter."+image.filename,
+        //     Body: rdata,
+        //     ContentType: contentType
+        //     }, function (error, resp) {
+        //     if (error) {
+        //         console.log('error putting  pic' + error);
+        //     } else {
+        //         console.log('Successfully uploaded  pic with response: ' + resp);
+        //     }
+        // })
+        // })
+        // .catch(err => {console.log(err); res.send(err);});
+        // await sharp(data.Body)
+        // .resize({
+        // kernel: sharp.kernel.nearest,
+        // height: 128,
+        // width: 128,
+        // fit: 'contain',
+        // background: { r: 0, g: 0, b: 0, alpha: 0 }
+        // })
+        // .toFormat(format)
+        // .toBuffer()
+        // .then(rdata => {
+        // s3.putObject({
+        //     Bucket: process.env.ROOT_BUCKET_NAME,
+        //     Key: "users/" + image.userID + "/pictures/" + image._id +".thumb."+image.filename,
+        //     Body: rdata,
+        //     ContentType: contentType
+        //     }, function (error, resp) {
+        //     if (error) {
+        //         console.log('error putting  pic' + error);
+        //     } else {
+        //         console.log('Successfully uploaded  pic with response: ' + resp);
+        //     }
+        // })
+        // })
+        // .catch(err => {console.log(err); res.send(err);});
+        // console.log("pics have been mangled!");
+        // res.send("resize successful!");
+
+        // }
+
+    })();//end async
+        
+  });
+      
