@@ -29,6 +29,10 @@ import { RunDataQuery } from "./connect/database.js"; //connection happens here
 
 import fs from 'fs/promises'
 
+const { Readable, Writable } = require("node:stream");
+const fs_sync = require("node:fs");
+
+import { readFile } from "node:fs/promises";
 const entities = require("entities"); //hrm
 // const fs = require("fs");
 
@@ -598,6 +602,11 @@ export async function GetObject(bucket, key, type) {
             const bytes = await response.Body.transformToByteArray();
             console.log("bytes length " + bytes.length);
             return bytes
+        } else if (type && type == "stream") {
+            // const stream = await response.Body.transformToWebStream();
+            // console.log("stream length " + stream);
+
+            return response //it's already a stream!
         } else {
             // The Body object also has 'transformToByteArray' and 'transformToWebStream' methods.
             const str = await response.Body.transformToString();
@@ -633,7 +642,7 @@ export async function PutObject(bucket, key, body, contentType) {
     
       try {
         const response = await s3.send(command);
-        console.log(response);
+        // console.log(response);
         return response;
       } catch (caught) {
         if (
@@ -1220,7 +1229,6 @@ app.post('/process_video_hls_local', requiredAuthentication, function (req, res)
 app.get('/resize_uploaded_picture/:_id', requiredAuthentication, function (req, res) { //presumes original pic has already been uploaded to production folder and db entry made
     console.log("tryna resize pic with key: " + req.params._id);
     
-
     (async () => { 
         try {
             var o_id = ObjectId.createFromHexString(req.params._id);
@@ -1232,191 +1240,169 @@ app.get('/resize_uploaded_picture/:_id', requiredAuthentication, function (req, 
             let extension = getExtension(image.filename).toLowerCase();
             let contentType = 'image/jpeg';
             let format = 'jpg';
+            let alphaValue = 1;
             if (extension == ".PNG" || extension == ".png") {
                 contentType = 'image/png';
                 format = 'png';
+                alphaValue = 0;
             } 
-            let bytes = await GetObject(process.env.ROOT_BUCKET_NAME, oKey, "binary"); //get the original pic
-            console.log("gots data with format " + format + "key : users/" + image.userID + "/pictures/originals/" + image._id +".original."+image.filename);
-            // const byteArray = await response.Body.transformToByteArray();
-            const buffer = Buffer.from(bytes);
-            // console.log("gotsa buffer with length " + byteArray.length);
-            if (format == 'jpg') {
+            let bytes = await GetObject(process.env.ROOT_BUCKET_NAME, oKey, "binary"); //get the original pic, returns byte array
+            console.log("gots data with format " + format + " with alpha " + alphaValue +  " key : users/" + image.userID + "/pictures/originals/" + image._id +".original."+image.filename);
+            const buffer = Buffer.from(bytes); //convert to buffer for sharp
+
                 const buff1 = await sharp(buffer)
                 .resize({
                 kernel: sharp.kernel.nearest,
                 height: 1024,
                 width: 1024,
-                fit: 'contain'
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: alphaValue }
                 })
-                .extend({
-                top: 0,
-                bottom: 0,
-                left: 0,
-                right: 0,
-                background: { r: 0, g: 0, b: 0, alpha: 1 }
-                })
+               
                 .toFormat(format)
                 .toBuffer();
 
                 // console.log("tryna put standard to key : users/" + image.userID + "/pictures/" + image._id +".standard."+image.filename );
                 let key1 = "users/" + image.userID + "/pictures/" + image._id +".standard."+image.filename;
                 const putstatus_1 = await PutObject(process.env.ROOT_BUCKET_NAME, key1, buff1, contentType); 
-                console.log("putstatus 1 " + JSON.stringify(putstatus_1));
+                console.log("putstatus 1 ok");
 
                 const buff2 = await sharp(buffer)
+                // .flatten({ background: { r: 0, g: 0, b: 0, alpha: alphaValue } })
                 .resize({
                 kernel: sharp.kernel.nearest,
                 height: 512,
                 width: 512,
-                fit: 'contain'
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: alphaValue }
                 })
-                .extend({
-                top: 0,
-                bottom: 0,
-                left: 0,
-                right: 0,
-                background: { r: 0, g: 0, b: 0, alpha: 1 }
-                })
+                
                 .toFormat(format)
                 .toBuffer();
                 
-                let key2 = "users/" + image.userID + "/pictures/" + image._id +".standard."+image.filename;
+                let key2 = "users/" + image.userID + "/pictures/" + image._id +".half."+image.filename;
                 const putstatus_2 = await PutObject(process.env.ROOT_BUCKET_NAME, key2, buff2, contentType); 
-                console.log("putstatus 2 " + JSON.stringify(putstatus_2));
+                console.log("putstatus 2 ok");
 
                 const buff3 = await sharp(buffer)
+                
                 .resize({
                 kernel: sharp.kernel.nearest,
                 height: 128,
                 width: 128,
-                fit: 'contain'
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: alphaValue }
                 })
-                .extend({
-                top: 0,
-                bottom: 0,
-                left: 0,
-                right: 0,
-                background: { r: 0, g: 0, b: 0, alpha: 1 }
-                })
+                
                 .toFormat(format)
                 .toBuffer();
                 
                 let key3 = "users/" + image.userID + "/pictures/" + image._id +".thumb."+image.filename;
                 const putstatus_3 = await PutObject(process.env.ROOT_BUCKET_NAME, key3, buff3, contentType); 
-                console.log("putstatus 2 " + JSON.stringify(putstatus_3));
-                console.log("Done resizng jpg!");
-            }
+                console.log("putstatus 3 ok");
+                console.log("Done resizng " + format);
+        
         } catch (e) {
-
+            console.log("error resizing pic " + e);
+            res.send("error resizing pic " + e);
         }
-
-        // } else { //if png, keep bg transparent
-        // console.log("format != jpg");
-        // await sharp(data.Body)
-        // .resize({
-        // kernel: sharp.kernel.nearest,
-        // height: 1024,
-        // width: 1024,
-        // fit: 'contain',
-        // background: { r: 0, g: 0, b: 0, alpha: 0 }
-        // })
-        // .toFormat(format)
-        // .toBuffer()
-        // .then(rdata => {
-            
-        // })
-        // .catch(err => {console.log(err); res.send(err);});
-        // const putstatus = await PutObject({
-        //     Bucket: process.env.ROOT_BUCKET_NAME,
-        //     Key: "users/" + image.userID + "/pictures/" + image._id +".standard."+image.filename,
-        //     Body: rdata,
-        //     ContentType: contentType
-        //     });
-
-        // await sharp(data.Body)
-        // .resize({
-        // kernel: sharp.kernel.nearest,
-        // height: 512,
-        // width: 512,
-        // fit: 'contain',
-        // ackground: { r: 0, g: 0, b: 0, alpha: 0 }
-        // })
-        // .toFormat(format)
-        // .toBuffer()
-        // .then(rdata => {
-        // s3.putObject({
-        //     Bucket: process.env.ROOT_BUCKET_NAME,
-        //     Key: "users/" + image.userID + "/pictures/" + image._id +".half."+image.filename,
-        //     Body: rdata,
-        //     ContentType: contentType
-        //     }, function (error, resp) {
-        //     if (error) {
-        //         console.log('error putting  pic' + error);
-        //     } else {
-        //         console.log('Successfully uploaded  pic with response: ' + resp);
-        //     }
-        // })
-        // })
-        // .catch(err => {console.log(err); res.send(err);});
-        // await sharp(data.Body)
-        // .resize({
-        // kernel: sharp.kernel.nearest,
-        // height: 256,
-        // width: 256,
-        // fit: 'contain',
-        // background: { r: 0, g: 0, b: 0, alpha: 0 }
-        // })
-        // .toFormat(format)
-        // .toBuffer()
-        // .then(rdata => {
-        // // let buf = Buffer.from(rdata);
-        // // let encodedData = rdata.toString('base64');
-        // s3.putObject({
-        //     Bucket: process.env.ROOT_BUCKET_NAME,
-        //     Key: "users/" + image.userID + "/pictures/" + image._id +".quarter."+image.filename,
-        //     Body: rdata,
-        //     ContentType: contentType
-        //     }, function (error, resp) {
-        //     if (error) {
-        //         console.log('error putting  pic' + error);
-        //     } else {
-        //         console.log('Successfully uploaded  pic with response: ' + resp);
-        //     }
-        // })
-        // })
-        // .catch(err => {console.log(err); res.send(err);});
-        // await sharp(data.Body)
-        // .resize({
-        // kernel: sharp.kernel.nearest,
-        // height: 128,
-        // width: 128,
-        // fit: 'contain',
-        // background: { r: 0, g: 0, b: 0, alpha: 0 }
-        // })
-        // .toFormat(format)
-        // .toBuffer()
-        // .then(rdata => {
-        // s3.putObject({
-        //     Bucket: process.env.ROOT_BUCKET_NAME,
-        //     Key: "users/" + image.userID + "/pictures/" + image._id +".thumb."+image.filename,
-        //     Body: rdata,
-        //     ContentType: contentType
-        //     }, function (error, resp) {
-        //     if (error) {
-        //         console.log('error putting  pic' + error);
-        //     } else {
-        //         console.log('Successfully uploaded  pic with response: ' + resp);
-        //     }
-        // })
-        // })
-        // .catch(err => {console.log(err); res.send(err);});
-        // console.log("pics have been mangled!");
-        // res.send("resize successful!");
-
-        // }
-
     })();//end async
         
-  });
-      
+});
+       
+async function DownloadAudioFile (params, location) {
+    //errors caught in calling function?
+    try {
+        const response = await GetObject(params.Bucket, params.Key, "stream");
+        console.log("response is " + response);
+        const fileStream = fs_sync.createWriteStream(location);
+        response.Body.pipe(fileStream);
+        console.log("done downloading audio..");
+    } catch (e) {
+        console.log("error downloading audio file! " +e);
+    }   
+}
+
+
+const ffmpegPromise_audioFiles = (inputPath, audio_id) => {
+    return new Promise((resolve, reject) => {
+        //   ffmpeg(inputPath)
+        //     .output(outputPath)
+        ffmpeg(inputPath)
+        .setFfmpegPath(ffmpeg_static)
+        
+        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + 'tmp.png')            
+        .complexFilter(
+        [
+            '[0:a]aformat=channel_layouts=mono,showwavespic=s=600x200'
+        ]
+        )
+        .outputOptions(['-vframes 1'])
+        // .format('png')
+
+        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + 'tmp.ogg')
+        .audioBitrate(192)
+        .audioCodec('libvorbis')
+        .format('ogg')
+
+        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + 'tmp.mp3')
+        .audioBitrate(192)
+        .audioCodec('libmp3lame')
+        .format('mp3')
+        .on('end', () => resolve("done squeezing audio"))
+        .on('progress', (progress) => {
+            console.log(`Frame: ${progress.frames} - Time: ${progress.timemark}`);
+        })
+        .on('error', (err) => reject(new Error(`FFmpeg failed: ${err.message}`)))
+
+        .run();
+    });
+}
+
+app.get('/process_audio_download/:_id', requiredAuthentication, function (req, res) { //download before processing, instead of streaming it// combined minio/s3 version
+    console.log("tryna process audio : " + req.params._id);
+    if (process.env.LOCAL_TEMP_FOLDER && process.env.LOCAL_TEMP_FOLDER != "") {
+        (async () => {
+            if (!busy) {    
+                try {
+                    busy = true;
+                    const o_id = ObjectId.createFromHexString(req.params._id);
+                    const query = {"_id": o_id};
+                    let audio_item = await RunDataQuery("audio_items", "findOne", query);
+                    let downloadpath = process.env.LOCAL_TEMP_FOLDER + audio_item._id;
+                    var params = {Bucket: process.env.ROOT_BUCKET_NAME, Key: 'users/' + audio_item.userID + '/audio/originals/' + audio_item._id + ".original." + audio_item.filename};
+                    let filename = audio_item._id +"."+ audio_item.filename;
+                    await fs.mkdir(downloadpath);
+                    await DownloadAudioFile(params, downloadpath + "/" + filename);
+                    console.log("file downloaded " + downloadpath + "/" + filename);
+                    const processed = await ffmpegPromise_audioFiles(downloadpath +"/"+ filename, audio_item._id); //send for processing
+                  
+                    console.log("done squeezin audio " + processed);
+                    const put1 = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + audio_item.userID + "/audio/" + audio_item._id +"."+path.parse(audio_item.filename).name + ".mp3",
+                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.mp3'),'audio/mp3');
+                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.mp3');
+
+                    const put2 = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + audio_item.userID + "/audio/" + audio_item._id +"."+path.parse(audio_item.filename).name + ".ogg",
+                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.ogg'),'audio/ogg');
+                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.ogg');
+                    
+                    const put3 = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + audio_item.userID + "/audio/" + audio_item._id +"."+path.parse(audio_item.filename).name + ".png",
+                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.png'),'audio/png');
+                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.png');
+
+                    busy = false;
+                    res.send("processed and uploading..");
+
+                } catch (e) {
+                    busy = false;
+                    console.log("error processing audio files " + e);
+                    res.send("error processing audio files " + e);
+                }
+            } else {
+                console.log("busy with audio processing, give us a shake...");
+            }
+        })();
+    } else {
+        console.log("no temp folder found!");
+    }
+});
