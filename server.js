@@ -1377,7 +1377,7 @@ app.get('/process_audio_download/:_id', requiredAuthentication, function (req, r
                     console.log("file downloaded " + downloadpath + "/" + filename);
                     const processed = await ffmpegPromise_audioFiles(downloadpath +"/"+ filename, audio_item._id); //send for processing
                   
-                    console.log("done squeezin audio " + processed);
+                    console.log("status processing audio " + processed); //files below should be in place now....
                     const put1 = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + audio_item.userID + "/audio/" + audio_item._id +"."+path.parse(audio_item.filename).name + ".mp3",
                     await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.mp3'),'audio/mp3');
                     fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.mp3');
@@ -1405,4 +1405,9 @@ app.get('/process_audio_download/:_id', requiredAuthentication, function (req, r
     } else {
         console.log("no temp folder found!");
     }
+});
+
+//TODO kruft mgmt, call this from admin pages to return unused assets
+app.get('/usage_report/:user_id/:filetype', requiredAuthentication, domainadmin, function (req, res){ 
+ 
 });
