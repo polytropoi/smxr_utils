@@ -1394,10 +1394,12 @@ app.get('/process_audio_download/:_id', requiredAuthentication, function (req, r
                     const put3 = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + audio_item.userID + "/audio/" + audio_item._id +"."+path.parse(audio_item.filename).name + ".png",
                     await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.png'),'audio/png');
                     console.log("put png good");
-                    // fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.ogg');
-                    // fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.mp3');
-                    // fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.png');
-                    // fs.unlink(downloadpath + "/" + filename);
+
+                    //cleanup
+                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.ogg');
+                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.mp3');
+                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.png');
+                    fs.unlink(downloadpath + "/" + filename);
 
                     busy = false;
                     console.log("processed and uploaded");
