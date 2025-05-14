@@ -1325,13 +1325,14 @@ async function DownloadAudioFile (params, location) {
 
 
 const ffmpegPromise_audioFiles = (inputPath, audio_id) => {
+    console.log("tryna process audioFile at inputPath "+ inputPath +" audioID "+ audio_id);
     return new Promise((resolve, reject) => {
         //   ffmpeg(inputPath)
         //     .output(outputPath)
         ffmpeg(inputPath)
-        .setFfmpegPath(ffmpeg_static)
+        // .setFfmpegPath(ffmpeg_static)
         
-        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + 'tmp.png')            
+        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + '.tmp.png')            
         .complexFilter(
         [
             '[0:a]aformat=channel_layouts=mono,showwavespic=s=600x200'
@@ -1340,20 +1341,24 @@ const ffmpegPromise_audioFiles = (inputPath, audio_id) => {
         .outputOptions(['-vframes 1'])
         // .format('png')
 
-        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + 'tmp.ogg')
+        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + '.tmp.ogg')
         .audioBitrate(192)
         .audioCodec('libvorbis')
         .format('ogg')
 
-        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + 'tmp.mp3')
+        .output(process.env.LOCAL_TEMP_FOLDER + "/" + audio_id + '.tmp.mp3')
         .audioBitrate(192)
         .audioCodec('libmp3lame')
         .format('mp3')
-        .on('end', () => resolve("done squeezing audio"))
+
+
+
         .on('progress', (progress) => {
             console.log(`Frame: ${progress.frames} - Time: ${progress.timemark}`);
         })
         .on('error', (err) => reject(new Error(`FFmpeg failed: ${err.message}`)))
+        .on('end', () => resolve("done squeezing audio"))
+      
 
         .run();
     });
@@ -1369,28 +1374,33 @@ app.get('/process_audio_download/:_id', requiredAuthentication, function (req, r
                     const o_id = ObjectId.createFromHexString(req.params._id);
                     const query = {"_id": o_id};
                     let audio_item = await RunDataQuery("audio_items", "findOne", query);
-                    let downloadpath = process.env.LOCAL_TEMP_FOLDER + audio_item._id;
+                    let downloadpath = process.env.LOCAL_TEMP_FOLDER;
                     var params = {Bucket: process.env.ROOT_BUCKET_NAME, Key: 'users/' + audio_item.userID + '/audio/originals/' + audio_item._id + ".original." + audio_item.filename};
                     let filename = audio_item._id +"."+ audio_item.filename;
-                    await fs.mkdir(downloadpath);
+                    // await fs.mkdir(downloadpath);
                     await DownloadAudioFile(params, downloadpath + "/" + filename);
                     console.log("file downloaded " + downloadpath + "/" + filename);
                     const processed = await ffmpegPromise_audioFiles(downloadpath +"/"+ filename, audio_item._id); //send for processing
                   
                     console.log("status processing audio " + processed); //files below should be in place now....
                     const put1 = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + audio_item.userID + "/audio/" + audio_item._id +"."+path.parse(audio_item.filename).name + ".mp3",
-                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.mp3'),'audio/mp3');
-                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.mp3');
+                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.mp3'),'audio/mp3');
+                    console.log("put mp3 good");
 
                     const put2 = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + audio_item.userID + "/audio/" + audio_item._id +"."+path.parse(audio_item.filename).name + ".ogg",
-                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.ogg'),'audio/ogg');
-                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.ogg');
+                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.ogg'),'audio/ogg');
+                    console.log("put ogg good");
                     
                     const put3 = await PutObject(process.env.ROOT_BUCKET_NAME,"users/" + audio_item.userID + "/audio/" + audio_item._id +"."+path.parse(audio_item.filename).name + ".png",
-                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.png'),'audio/png');
-                    fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + 'tmp.png');
+                    await readFile(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.png'),'audio/png');
+                    console.log("put png good");
+                    // fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.ogg');
+                    // fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.mp3');
+                    // fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.png');
+                    // fs.unlink(downloadpath + "/" + filename);
 
                     busy = false;
+                    console.log("processed and uploaded");
                     res.send("processed and uploading..");
 
                 } catch (e) {
