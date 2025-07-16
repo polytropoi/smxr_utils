@@ -1245,6 +1245,10 @@ app.get('/resize_uploaded_picture/:_id', requiredAuthentication, function (req, 
                 contentType = 'image/png';
                 format = 'png';
                 alphaValue = 0;
+            } else if (extension == ".webp" || extension == ".WEBP") {
+                contentType = 'image/webp';
+                format = 'webp';
+                alphaValue = 0;
             } 
             let bytes = await GetObject(process.env.ROOT_BUCKET_NAME, oKey, "binary"); //get the original pic, returns byte array
             console.log("gots data with format " + format + " with alpha " + alphaValue +  " key : users/" + image.userID + "/pictures/originals/" + image._id +".original."+image.filename);
