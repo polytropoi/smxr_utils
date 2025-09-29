@@ -46,6 +46,17 @@ const __dirname = path.dirname(__filename); // get the name of the directory
 export let app = express();
 require('dotenv').config();
 
+
+import sqlite3 from 'sqlite3';
+const SQLite3 = sqlite3.verbose(); // For verbose mode
+let db = new sqlite3.Database('./smxr_bu.db', (err) => {
+    if (err) {
+        console.error(err.message);
+    }
+    console.log('Connected to the SQLite database.');
+});
+
+
 export let googleMapsKey = process.env.GOOGLEMAPS_KEY;
 
 // app.use(helmet.contentSecurityPolicy());
@@ -1426,4 +1437,54 @@ app.get('/process_audio_download/:_id', requiredAuthentication, function (req, r
 //TODO kruft mgmt, call this from admin pages to return unused assets
 app.get('/usage_report/:user_id/:filetype', requiredAuthentication, domainadmin, function (req, res){ 
  
+});
+
+
+app.get('/copydata/', requiredAuthentication, function (req, res) { //presumes original pic has already been uploaded to production folder and db entry made
+    // console.log("tryna resize pic with key: " + req.params._id);
+    
+    (async () => {
+
+        try {
+        
+            const query = {};
+            const scenes = await RunDataQuery("scenes","find",query,null);
+            console.log("scenes length " + scenes.length);
+
+                const createTableSql = `
+                CREATE TABLE IF NOT EXISTS scenes (
+                    
+                    _id TEXT NOT NULL UNIQUE,
+                    short_id TEXT NOT NULL UNIQUE,
+                    sceneData TEXT NOT NULL
+                );
+            `;
+
+            db.run(createTableSql, (err) => {
+                if (err) {
+                    console.error(err.message);
+                } else {
+                    console.log('Table "scenes" created or already exists.');
+                }
+            });
+
+            const stmt = db.prepare('INSERT INTO scenes (_id, short_id, sceneData) VALUES (?, ?, ?)');
+
+            for (let i = 0; i < scenes.length; i++) {
+
+                const scene = scenes[i];
+                console.log(JSON.stringify(scene));
+                stmt.run(scene._id, scenes.short_id, JSON.stringify(scene));
+                // INSERT INTO scenes (json_column_name) VALUES ('{"key1": "value1", "key2": 123}');
+
+            }
+                        // const stmt = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
+
+
+        } catch (e) {
+
+            console.log("error copying data " + e);
+        
+        }
+    })();
 });
