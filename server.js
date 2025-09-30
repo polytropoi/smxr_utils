@@ -1453,32 +1453,35 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //presumes o
 
                 const createTableSql = `
                 CREATE TABLE IF NOT EXISTS scenes (
-                    
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     _id TEXT NOT NULL UNIQUE,
                     short_id TEXT NOT NULL UNIQUE,
                     sceneData TEXT NOT NULL
                 );
             `;
-
+        
+        db.serialize(function() { //sqlite3 driver needs
             db.run(createTableSql, (err) => {
                 if (err) {
                     console.error(err.message);
                 } else {
                     console.log('Table "scenes" created or already exists.');
+
+                    const stmt = db.prepare('INSERT INTO scenes (_id, short_id, sceneData) VALUES (?, ?, ?)');
+
+                    for (let i = 0; i < scenes.length; i++) {
+
+                        if (scenes[i].short_id) {
+                            const scene = scenes[i];
+                            console.log(scene.short_id);
+                            stmt.run([scene._id.toString(), scene.short_id, JSON.stringify(scene)]);
+                            // INSERT INTO scenes (json_column_name) VALUES ('{"key1": "value1", "key2": 123}');
+                        }
+                    }
+                            // const stmt = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
                 }
             });
-
-            const stmt = db.prepare('INSERT INTO scenes (_id, short_id, sceneData) VALUES (?, ?, ?)');
-
-            for (let i = 0; i < scenes.length; i++) {
-
-                const scene = scenes[i];
-                console.log(JSON.stringify(scene));
-                stmt.run(scene._id, scenes.short_id, JSON.stringify(scene));
-                // INSERT INTO scenes (json_column_name) VALUES ('{"key1": "value1", "key2": 123}');
-
-            }
-                        // const stmt = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
+        });
 
 
         } catch (e) {

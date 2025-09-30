@@ -20,7 +20,7 @@ SqliteGuiNode(db).catch((err) => {
   console.error("Error starting the GUI:", err);
 });
 
-app.listen(5000);
+app.listen(5100);
 
 //   db.serialize(() => {
 //       db.run("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)");
