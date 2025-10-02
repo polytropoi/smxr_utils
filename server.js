@@ -25,7 +25,9 @@ import sharp from "sharp";
 import bcrypt from "bcryptjs"; //just drop in replacement ?!? ok then
 
 import { ObjectId } from "mongodb";
-import { RunDataQuery } from "./connect/database.js"; //connection happens here
+import { SqliteGuiNode } from 'sqlite-gui-node'; 
+import { RunDataQuery } from "./connect/database.js"; //connection happens here //todo put sqlite alt
+
 
 import fs from 'fs/promises'
 
@@ -190,6 +192,11 @@ server.timeout = 240000;
 server.keepAliveTimeout = 24000;
 server.listen(process.env.PORT || 4000, function() {
     console.log("Express server listening on port 4000");
+});
+
+//if env.process.sqlite or dbmode or something...
+SqliteGuiNode(db).catch((err) => {
+  console.error("Error starting the GUI:", err);
 });
 
 // INCLUDE EXTERNAL ROUTES BELOW
@@ -1451,7 +1458,7 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //presumes o
             const scenes = await RunDataQuery("scenes","find",query,null);
             console.log("scenes length " + scenes.length);
 
-                const createTableSql = `
+            const createScenesTableSql = `
                 CREATE TABLE IF NOT EXISTS scenes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     _id TEXT NOT NULL UNIQUE,
@@ -1460,28 +1467,28 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //presumes o
                 );
             `;
         
-        db.serialize(function() { //sqlite3 driver needs
-            db.run(createTableSql, (err) => {
-                if (err) {
-                    console.error(err.message);
-                } else {
-                    console.log('Table "scenes" created or already exists.');
+            db.serialize(function() { //sqlite3 driver needs
+                db.run(createScenesTableSql, (err) => {
+                    if (err) {
+                        console.error(err.message);
+                    } else {
+                        console.log('Table "scenes" created or already exists.');
 
-                    const stmt = db.prepare('INSERT INTO scenes (_id, short_id, sceneData) VALUES (?, ?, ?)');
+                        const stmt = db.prepare('INSERT OR REPLACE INTO scenes (_id, short_id, sceneData) VALUES (?, ?, ?)');
 
-                    for (let i = 0; i < scenes.length; i++) {
+                        for (let i = 0; i < scenes.length; i++) {
 
-                        if (scenes[i].short_id) {
-                            const scene = scenes[i];
-                            console.log(scene.short_id);
-                            stmt.run([scene._id.toString(), scene.short_id, JSON.stringify(scene)]);
-                            // INSERT INTO scenes (json_column_name) VALUES ('{"key1": "value1", "key2": 123}');
+                            if (scenes[i].short_id) {
+                                const scene = scenes[i];
+                                console.log(scene.short_id);
+                                stmt.run([scene._id.toString(), scene.short_id, JSON.stringify(scene)]);
+                                // INSERT INTO scenes (json_column_name) VALUES ('{"key1": "value1", "key2": 123}');
+                            }
                         }
+                                // const stmt = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
                     }
-                            // const stmt = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
-                }
+                });
             });
-        });
 
 
         } catch (e) {
