@@ -1463,7 +1463,13 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //presumes o
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     _id TEXT NOT NULL UNIQUE,
                     short_id TEXT NOT NULL UNIQUE,
-                    sceneData TEXT NOT NULL
+                    otimestamp TEXT NOT NULL,
+                    sceneTitle TEXT NOT NULL,
+                    sceneOwner_userID TEXT NOT NULL,
+                    sceneOwner_userName TEXT NOT NULL,
+                    sceneTags TEXT,
+                    sceneLocations TEXT
+
                 );
             `;
         
@@ -1474,14 +1480,16 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //presumes o
                     } else {
                         console.log('Table "scenes" created or already exists.');
 
-                        const stmt = db.prepare('INSERT OR REPLACE INTO scenes (_id, short_id, sceneData) VALUES (?, ?, ?)');
+                        const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
+                            '_id, short_id, otimestamp, sceneTitle, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneLocations )' +
+                            'VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 
                         for (let i = 0; i < scenes.length; i++) {
 
-                            if (scenes[i].short_id) {
+                            if (scenes[i].short_id && scenes[i].sceneTitle && scenes[i].otimestamp) {
                                 const scene = scenes[i];
                                 console.log(scene.short_id);
-                                stmt.run([scene._id.toString(), scene.short_id, JSON.stringify(scene)]);
+                                stmt.run([scene._id.toString(), scene.short_id, scene.otimestamp, scene.sceneTitle, scene.user_id, scene.userName, JSON.stringify(scene.sceneTags), JSON.stringify(scene.sceneLocations)]);
                                 // INSERT INTO scenes (json_column_name) VALUES ('{"key1": "value1", "key2": 123}');
                             }
                         }
