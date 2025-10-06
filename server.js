@@ -1447,33 +1447,65 @@ app.get('/usage_report/:user_id/:filetype', requiredAuthentication, domainadmin,
 });
 
 
-app.get('/copydata/', requiredAuthentication, function (req, res) { //presumes original pic has already been uploaded to production folder and db entry made
+app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo data into sqlite!
     // console.log("tryna resize pic with key: " + req.params._id);
     
     (async () => {
 
         try {
+            // await fs.unlink('smxr_bu.db', (err) => {
+            //     if (err) {
+            //         console.error('Error deleting file:', err);
+            //     } else {
+            //         console.log('File deleted successfully!');
+            //     }
+            // });
         
             const query = {};
             const scenes = await RunDataQuery("scenes","find",query,null);
             console.log("scenes length " + scenes.length);
 
-            const createScenesTableSql = `
+            //ugh, backticks... //TODO scene_locations table...
+            const createScenesTableSql = ` 
                 CREATE TABLE IF NOT EXISTS scenes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     _id TEXT NOT NULL UNIQUE,
                     short_id TEXT NOT NULL UNIQUE,
                     otimestamp TEXT NOT NULL,
                     sceneTitle TEXT NOT NULL,
+                    sceneDomain TEXT,
                     sceneOwner_userID TEXT NOT NULL,
                     sceneOwner_userName TEXT NOT NULL,
                     sceneTags TEXT,
-                    sceneLocations TEXT
+                    sceneAlias TEXT,
+                    sceneLocations TEXT,
+                    sceneStickyness INTEGER,
+                    sceneType TEXT,
+                    sceneYouTubeIDs TEXT,
+                    videoStreamUrls TEXT,
+                    scenePeopleGroupID TEXT, 
+                    sceneLocationGroups TEXT, 
+                    scenePrimaryAudioGroups TEXT, 
+                    sceneAmbientAudioGroups TEXT, 
+                    sceneTriggerAudioGroups TEXT, 
+                    scenePictureGroups TEXT,
+                    sceneTextGroups TEXT, 
+                    sceneVideoGroups TEXT,
+                    sceneVideos TEXT
 
                 );
             `;
         
-            db.serialize(function() { //sqlite3 driver needs
+
+            //  scenePeopleGroupID 
+            // sceneLocationGroups 
+            // sceneAudioGroups 
+            // scenePictureGroups
+            // sceneTextGroups 
+            // sceneVideoGroups
+            // sceneVideos 
+
+            await db.serialize(function() { //sqlite3 driver needs
                 db.run(createScenesTableSql, (err) => {
                     if (err) {
                         console.error(err.message);
@@ -1481,15 +1513,43 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //presumes o
                         console.log('Table "scenes" created or already exists.');
 
                         const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
-                            '_id, short_id, otimestamp, sceneTitle, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneLocations )' +
-                            'VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+                            '_id, short_id, otimestamp, sceneTitle, sceneDomain, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneAlias, sceneLocations, sceneStickyness, sceneType,'+
+                            'sceneYouTubeIDs, videoStreamUrls, scenePeopleGroupID, sceneLocationGroups, scenePrimaryAudioGroups, sceneAmbientAudioGroups, sceneTriggerAudioGroups, scenePictureGroups, sceneTextGroups, sceneVideoGroups, sceneVideos' +
+                            ')' +
+                            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
                         for (let i = 0; i < scenes.length; i++) {
 
                             if (scenes[i].short_id && scenes[i].sceneTitle && scenes[i].otimestamp) {
                                 const scene = scenes[i];
+                                const youtubeIDs = scene.sceneYouTubeIDs.length ? scene.sceneYouTubeIDs : '';
+                                const videoGroups = (scene.sceneVideoGroups && scene.sceneVideoGroups != "") ? scene.sceneVideoGroups : '';
                                 console.log(scene.short_id);
-                                stmt.run([scene._id.toString(), scene.short_id, scene.otimestamp, scene.sceneTitle, scene.user_id, scene.userName, JSON.stringify(scene.sceneTags), JSON.stringify(scene.sceneLocations)]);
+                                stmt.run([
+                                    scene._id.toString(), 
+                                    scene.short_id, 
+                                    scene.otimestamp, 
+                                    scene.sceneTitle, 
+                                    scene.sceneDomain, 
+                                    scene.user_id, 
+                                    scene.userName, 
+                                    JSON.stringify(scene.sceneTags), 
+                                    scene.sceneAlias, 
+                                    JSON.stringify(scene.sceneLocations), 
+                                    scene.sceneStickyness,
+                                    scene.sceneType, 
+                                    JSON.stringify(youtubeIDs), 
+                                    JSON.stringify(scene.videoStreamUrls),
+                                    JSON.stringify(scene.scenePeopleGroupID),
+                                    JSON.stringify(scene.sceneLocationGroups),
+                                    JSON.stringify(scene.scenePrimaryAudioGroups),
+                                    JSON.stringify(scene.sceneAmbientAudioGroups),
+                                    JSON.stringify(scene.sceneTriggerAudioGroups),
+                                    JSON.stringify(scene.scenePictureGroups),
+                                    JSON.stringify(scene.sceneTextGroups),
+                                    JSON.stringify(videoGroups),
+                                    JSON.stringify(scene.sceneVideos),
+                                ]);
                                 // INSERT INTO scenes (json_column_name) VALUES ('{"key1": "value1", "key2": 123}');
                             }
                         }
