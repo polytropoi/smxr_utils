@@ -1487,11 +1487,11 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                     sceneCategory TEXT,
                     sceneAuthLevel INTEGER,
                     sceneData TEXT NOT NULL
-                   
                 );
             `;
+
             const createPicturesTableSql = `
-                CREATE TABLE IF NOT EXISTS pictures,
+                CREATE TABLE IF NOT EXISTS pictures (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     _id TEXT NOT NULL UNIQUE,
                     title TEXT,
@@ -1503,19 +1503,19 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                     ofilesize TEXT,
                     pictureTags TEXT,
                     pictureData TEXT NOT NULL
-
-                    
                 );
             `;
 
             await db.exec(createScenesTableSql);
-            // await db.exec(createPicturesTableSql);
+            console.log("scenes table OK");
+            await db.exec(createPicturesTableSql);
+            console.log("pictures table OK");
 
             const scenesQuery = {};
-            const scenes = await RunDataQuery("scenes","find",scenesQuery,null);
+            const scenes = await RunDataQuery("scenes", "find", scenesQuery, null);
             console.log("scenes length " + scenes.length);
-            for (let i = 0; i < scenes.length; i++) {
 
+            for (let i = 0; i < scenes.length; i++) {
                 if (scenes[i].short_id && scenes[i].sceneTitle && scenes[i].otimestamp) {
                     const scene = scenes[i];
                     let authLevel = 1;
@@ -1533,7 +1533,6 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                         scene.userName, 
                         JSON.stringify(scene.sceneTags), 
                         scene.sceneAlias, 
-                        // JSON.stringify(scene.sceneLocations), 
                         scene.sceneStickyness,
                         scene.sceneType, 
                         authLevel,
@@ -1542,6 +1541,29 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                     // console.log("scenes copy result " + result);
                 }
             }
+
+            const picturesQuery = {};
+            const pictures = await RunDataQuery("image_items", "find", picturesQuery, null);
+            console.log("pictures length " + pictures.length);
+            for (let i = 0; i < pictures.length; i++) {
+                if (pictures[i].otimestamp) {
+                    const picture = pictures[i];
+                    const result = await db.run('INSERT OR REPLACE INTO pictures(_id, title, filename, orientation, owner_userID, owner_userName, otimestamp, pictureTags, pictureData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                        picture._id.toString(), 
+                        picture.title, 
+                        picture.filename,
+                        picture.orientation,  
+                        picture.userID,
+                        picture.userName,
+                        picture.otimestamp, 
+                        JSON.stringify(picture.tags),
+                        JSON.stringify(picture)
+                    );
+                    // console.log("scenes copy result " + result);
+                }
+            }
+
             // const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
                           
             //                 '_id, short_id, otimestamp, sceneTitle, sceneDomain, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneAlias, sceneStickyness, sceneType,'+
