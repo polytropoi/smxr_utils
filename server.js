@@ -51,13 +51,17 @@ require('dotenv').config();
 
 import sqlite3 from 'sqlite3';
 const SQLite3 = sqlite3.verbose(); // For verbose mode
-let db = new sqlite3.Database('./smxr_bu.db', (err) => {
-    if (err) {
-        console.error(err.message);
-    }
-    console.log('Connected to the SQLite database.');
+// let mdb = new sqlite3.Database('./smxr_bu.db', (err) => {
+//     if (err) {
+//         console.error(err.message);
+//     }
+//     console.log('Connected to the SQLite database.');
+// });
+import { open } from 'sqlite'
+let db = await open({
+    filename: './smxr_bu.db',
+    driver: sqlite3.Database
 });
-
 
 export let googleMapsKey = process.env.GOOGLEMAPS_KEY;
 
@@ -195,9 +199,9 @@ server.listen(process.env.PORT || 4000, function() {
 });
 
 //if env.process.sqlite or dbmode or something...
-SqliteGuiNode(db).catch((err) => {
-  console.error("Error starting the GUI:", err);
-});
+    // SqliteGuiNode(mdb).catch((err) => {
+    // console.error("Error starting the GUI:", err);
+    // });
 
 // INCLUDE EXTERNAL ROUTES BELOW
 
@@ -1461,9 +1465,9 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
             //     }
             // });
         
-            const query = {};
-            const scenes = await RunDataQuery("scenes","find",query,null);
-            console.log("scenes length " + scenes.length);
+            // const scenesQuery = {};
+            // const scenes = await RunDataQuery("scenes","find",scenesQuery,null);
+            // console.log("scenes length " + scenes.length);
 
             //ugh, backticks... //TODO scene_locations table...
             const createScenesTableSql = ` 
@@ -1478,85 +1482,168 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                     sceneOwner_userName TEXT NOT NULL,
                     sceneTags TEXT,
                     sceneAlias TEXT,
-                    sceneLocations TEXT,
                     sceneStickyness INTEGER,
                     sceneType TEXT,
-                    sceneYouTubeIDs TEXT,
-                    videoStreamUrls TEXT,
-                    scenePeopleGroupID TEXT, 
-                    sceneLocationGroups TEXT, 
-                    scenePrimaryAudioGroups TEXT, 
-                    sceneAmbientAudioGroups TEXT, 
-                    sceneTriggerAudioGroups TEXT, 
-                    scenePictureGroups TEXT,
-                    sceneTextGroups TEXT, 
-                    sceneVideoGroups TEXT,
-                    sceneVideos TEXT
-
+                    sceneCategory TEXT,
+                    sceneAuthLevel INTEGER,
+                    sceneData TEXT NOT NULL
+                   
                 );
             `;
-        
+            const createPicturesTableSql = `
+                CREATE TABLE IF NOT EXISTS pictures,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    _id TEXT NOT NULL UNIQUE,
+                    title TEXT,
+                    filename TEXT,
+                    orientation TEXT,
+                    owner_userID TEXT,
+                    owner_userName TEXT,
+                    otimestamp TEXT,
+                    ofilesize TEXT,
+                    pictureTags TEXT,
+                    pictureData TEXT NOT NULL
 
-            //  scenePeopleGroupID 
-            // sceneLocationGroups 
-            // sceneAudioGroups 
-            // scenePictureGroups
-            // sceneTextGroups 
-            // sceneVideoGroups
-            // sceneVideos 
+                    
+                );
+            `;
 
-            await db.serialize(function() { //sqlite3 driver needs
-                db.run(createScenesTableSql, (err) => {
-                    if (err) {
-                        console.error(err.message);
-                    } else {
-                        console.log('Table "scenes" created or already exists.');
+            await db.exec(createScenesTableSql);
+            // await db.exec(createPicturesTableSql);
 
-                        const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
-                            '_id, short_id, otimestamp, sceneTitle, sceneDomain, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneAlias, sceneLocations, sceneStickyness, sceneType,'+
-                            'sceneYouTubeIDs, videoStreamUrls, scenePeopleGroupID, sceneLocationGroups, scenePrimaryAudioGroups, sceneAmbientAudioGroups, sceneTriggerAudioGroups, scenePictureGroups, sceneTextGroups, sceneVideoGroups, sceneVideos' +
-                            ')' +
-                            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            const scenesQuery = {};
+            const scenes = await RunDataQuery("scenes","find",scenesQuery,null);
+            console.log("scenes length " + scenes.length);
+            for (let i = 0; i < scenes.length; i++) {
 
-                        for (let i = 0; i < scenes.length; i++) {
-
-                            if (scenes[i].short_id && scenes[i].sceneTitle && scenes[i].otimestamp) {
-                                const scene = scenes[i];
-                                const youtubeIDs = scene.sceneYouTubeIDs.length ? scene.sceneYouTubeIDs : '';
-                                const videoGroups = (scene.sceneVideoGroups && scene.sceneVideoGroups != "") ? scene.sceneVideoGroups : '';
-                                console.log(scene.short_id);
-                                stmt.run([
-                                    scene._id.toString(), 
-                                    scene.short_id, 
-                                    scene.otimestamp, 
-                                    scene.sceneTitle, 
-                                    scene.sceneDomain, 
-                                    scene.user_id, 
-                                    scene.userName, 
-                                    JSON.stringify(scene.sceneTags), 
-                                    scene.sceneAlias, 
-                                    JSON.stringify(scene.sceneLocations), 
-                                    scene.sceneStickyness,
-                                    scene.sceneType, 
-                                    JSON.stringify(youtubeIDs), 
-                                    JSON.stringify(scene.videoStreamUrls),
-                                    JSON.stringify(scene.scenePeopleGroupID),
-                                    JSON.stringify(scene.sceneLocationGroups),
-                                    JSON.stringify(scene.scenePrimaryAudioGroups),
-                                    JSON.stringify(scene.sceneAmbientAudioGroups),
-                                    JSON.stringify(scene.sceneTriggerAudioGroups),
-                                    JSON.stringify(scene.scenePictureGroups),
-                                    JSON.stringify(scene.sceneTextGroups),
-                                    JSON.stringify(videoGroups),
-                                    JSON.stringify(scene.sceneVideos),
-                                ]);
-                                // INSERT INTO scenes (json_column_name) VALUES ('{"key1": "value1", "key2": 123}');
-                            }
-                        }
-                                // const stmt = db.prepare('INSERT INTO users (name, email) VALUES (?, ?)');
+                if (scenes[i].short_id && scenes[i].sceneTitle && scenes[i].otimestamp) {
+                    const scene = scenes[i];
+                    let authLevel = 1;
+                    if (scene.sceneShareWithPublic) {
+                        authLevel = 0;
                     }
-                });
-            });
+                    const result = await db.run('INSERT OR REPLACE INTO scenes(_id, short_id, otimestamp, sceneTitle, sceneDomain, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneAlias, sceneStickyness, sceneType,'+
+                    'sceneAuthLevel, sceneData) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                        scene._id.toString(), 
+                        scene.short_id, 
+                        scene.otimestamp, 
+                        scene.sceneTitle, 
+                        scene.sceneDomain, 
+                        scene.user_id, 
+                        scene.userName, 
+                        JSON.stringify(scene.sceneTags), 
+                        scene.sceneAlias, 
+                        // JSON.stringify(scene.sceneLocations), 
+                        scene.sceneStickyness,
+                        scene.sceneType, 
+                        authLevel,
+                        JSON.stringify(scene)
+                    );
+                    // console.log("scenes copy result " + result);
+                }
+            }
+            // const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
+                          
+            //                 '_id, short_id, otimestamp, sceneTitle, sceneDomain, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneAlias, sceneStickyness, sceneType,'+
+            //                 'sceneAuthLevel, sceneData)' +
+            //                 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            //             for (let i = 0; i < scenes.length; i++) {
+
+            //                 if (scenes[i].short_id && scenes[i].sceneTitle && scenes[i].otimestamp) {
+            //                     const scene = scenes[i];
+                              
+            //                     let authLevel = 1;
+            //                     if (scene.shareWithPublic) {
+            //                         authLevel = 0;
+            //                     }
+            //                     console.log(scene.short_id);
+            //                     stmt.run([
+            //                         scene._id.toString(), 
+            //                         scene.short_id, 
+            //                         scene.otimestamp, 
+            //                         scene.sceneTitle, 
+            //                         scene.sceneDomain, 
+            //                         scene.user_id, 
+            //                         scene.userName, 
+            //                         JSON.stringify(scene.sceneTags), 
+            //                         scene.sceneAlias, 
+            //                         // JSON.stringify(scene.sceneLocations), 
+            //                         scene.sceneStickyness,
+            //                         scene.sceneType, 
+            //                         authLevel,
+            //                         JSON.stringify(scene)
+                                   
+            //                     ]);
+            //                 }
+            //             }
+            //         // }
+        
+            // db.serialize(function() { //sqlite3 driver needs
+            //     db.run(createScenesTableSql, (err) => {
+            //         if (err) {
+            //             console.error(err.message);
+            //         } else {
+            //             console.log('Table "scenes" created or already exists.');
+
+                    //     const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
+                          
+                    //         '_id, short_id, otimestamp, sceneTitle, sceneDomain, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneAlias, sceneStickyness, sceneType,'+
+                    //         'sceneAuthLevel, sceneData)' +
+                    //         'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                    //     for (let i = 0; i < scenes.length; i++) {
+
+                    //         if (scenes[i].short_id && scenes[i].sceneTitle && scenes[i].otimestamp) {
+                    //             const scene = scenes[i];
+                              
+                    //             let authLevel = 1;
+                    //             if (scene.shareWithPublic) {
+                    //                 authLevel = 0;
+                    //             }
+                    //             console.log(scene.short_id);
+                    //             stmt.run([
+                    //                 scene._id.toString(), 
+                    //                 scene.short_id, 
+                    //                 scene.otimestamp, 
+                    //                 scene.sceneTitle, 
+                    //                 scene.sceneDomain, 
+                    //                 scene.user_id, 
+                    //                 scene.userName, 
+                    //                 JSON.stringify(scene.sceneTags), 
+                    //                 scene.sceneAlias, 
+                    //                 // JSON.stringify(scene.sceneLocations), 
+                    //                 scene.sceneStickyness,
+                    //                 scene.sceneType, 
+                    //                 authLevel,
+                    //                 JSON.stringify(scene)
+                                   
+                    //             ]);
+                    //         }
+                    //     }
+                    // }
+            //     });
+
+            //     db.run(createPicturesTableSql, (err) => {
+            //         if (err) {
+            //             console.error(err.message);
+            //         } else {
+            //         console.log('Table "scenes" created or already exists.');
+
+            //             const stmt = db.prepare('INSERT OR REPLACE INTO pictures (' +
+                          
+            //             '_id, title, filename, orientation, owner_userID, owner_userName, otimestamp,  pictureTags, pictureData'+
+            //                 'sceneAuthLevel, sceneData)' +
+            //                 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+
+            //               for (let i = 0; i < scenes.length; i++) {
+
+
+            //               }
+            //         }
+            //     });
+
+            // });
+
+
 
 
         } catch (e) {
@@ -1566,3 +1653,14 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
         }
     })();
 });
+
+function toCSV(json) {
+  json = Object.values(json);
+  var csv = "";
+  var keys = (json[0] && Object.keys(json[0])) || [];
+  csv += keys.join(',') + '\n';
+  for (var line of json) {
+    csv += keys.map(key => line[key]).join(',') + '\n';
+  }
+  return csv;
+}
