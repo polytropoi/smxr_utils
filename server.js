@@ -1506,10 +1506,27 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                 );
             `;
 
+            const createAudioTableSql = `
+                CREATE TABLE IF NOT EXISTS audio (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    _id TEXT NOT NULL UNIQUE,
+                    title TEXT,
+                    filename TEXT,
+                    owner_userID TEXT,
+                    owner_userName TEXT,
+                    otimestamp TEXT,
+                    ofilesize TEXT,
+                    audioTags TEXT,
+                    audioData TEXT NOT NULL
+                );
+            `;
+
             await db.exec(createScenesTableSql);
             console.log("scenes table OK");
             await db.exec(createPicturesTableSql);
             console.log("pictures table OK");
+            await db.exec(createAudioTableSql);
+            console.log("audio table ok");
 
             const scenesQuery = {};
             const scenes = await RunDataQuery("scenes", "find", scenesQuery, null);
@@ -1564,6 +1581,27 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                 }
             }
 
+            const audioQuery = {};
+            const audios = await RunDataQuery("audio_items", "find", audioQuery, null);
+            console.log("aduio length " + audios.length);
+            for (let i = 0; i < audios.length; i++) {
+                if (audios[i].otimestamp) {
+                    const audio = audios[i];
+                    const result = await db.run('INSERT OR REPLACE INTO audio(_id, title, filename, owner_userID, owner_userName, otimestamp, ofilesize, audioTags, audioData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                        audio._id.toString(), 
+                        audio.title, 
+                        audio.filename,
+                        audio.userID,
+                        audio.userName,
+                        audio.otimestamp,
+                        audio.ofilesize, 
+                        JSON.stringify(audio.tags),
+                        JSON.stringify(audio)
+                    );
+                    // console.log("scenes copy result " + result);
+                }
+            }
             // const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
                           
             //                 '_id, short_id, otimestamp, sceneTitle, sceneDomain, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneAlias, sceneStickyness, sceneType,'+
