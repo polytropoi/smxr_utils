@@ -1451,12 +1451,16 @@ app.get('/usage_report/:user_id/:filetype', requiredAuthentication, domainadmin,
 });
 
 
+let copying = false;
 app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo data into sqlite!
-    // console.log("tryna resize pic with key: " + req.params._id);
-    
+
+    if (copying) {
+        return;
+    }
     (async () => {
 
         try {
+            copying = true;
             // await fs.unlink('smxr_bu.db', (err) => {
             //     if (err) {
             //         console.error('Error deleting file:', err);
@@ -1465,11 +1469,8 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
             //     }
             // });
         
-            // const scenesQuery = {};
-            // const scenes = await RunDataQuery("scenes","find",scenesQuery,null);
-            // console.log("scenes length " + scenes.length);
 
-            //ugh, backticks... //TODO scene_locations table...
+            //ugh, backticks... //TODO scene_locations table?  nah, just refs and json
             const createScenesTableSql = ` 
                 CREATE TABLE IF NOT EXISTS scenes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1520,13 +1521,99 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                     audioData TEXT NOT NULL
                 );
             `;
+            const createVideoTableSql = `
+                CREATE TABLE IF NOT EXISTS video (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    _id TEXT NOT NULL UNIQUE,
+                    title TEXT,
+                    filename TEXT,
+                    owner_userID TEXT,
+                    owner_userName TEXT,
+                    otimestamp TEXT,
+                    ofilesize TEXT,
+                    videoTags TEXT,
+                    videoData TEXT NOT NULL
+                );
+            `;
 
+            const createTextsTableSql = `
+                CREATE TABLE IF NOT EXISTS texts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    _id TEXT NOT NULL UNIQUE,
+                    title TEXT,
+                    type TEXT,
+                    owner_userID TEXT,
+                    owner_userName TEXT,
+                    otimestamp TEXT,
+                    textTags TEXT,
+                    textString TEXT,
+                    textData TEXT NOT NULL
+                );
+            `;
+
+            const createModelsTableSql = `
+                CREATE TABLE IF NOT EXISTS models (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    _id TEXT NOT NULL UNIQUE,
+                    name TEXT,
+                    filename TEXT,
+                    type TEXT,
+                    owner_userID TEXT,
+                    owner_userName TEXT,
+                    otimestamp TEXT,
+                    ofilesize TEXT,
+                    modelTags TEXT,
+                    modelData TEXT NOT NULL
+                );
+            `;
+
+            const createObjectsTableSql = `
+                CREATE TABLE IF NOT EXISTS objects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    _id TEXT NOT NULL UNIQUE,
+                    name TEXT,
+                    title TEXT
+                    type TEXT,
+                    category TEXT,
+                    subcategory TEXT,
+                    class TEXT
+                    owner_userID TEXT,
+                    owner_userName TEXT,
+                    otimestamp TEXT,
+                    objectTags TEXT,
+                    objectData TEXT NOT NULL
+                );
+            `;
+
+            const createGroupsTableSql = `
+                CREATE TABLE IF NOT EXISTS groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    _id TEXT NOT NULL UNIQUE,
+                    name TEXT,
+                    type TEXT,
+                    owner_userID TEXT,
+                    owner_userName TEXT,
+                    itemIDs TEXT,
+                    groupTags TEXT,
+                    groupData TEXT NOT NULL
+                );
+            `;
             await db.exec(createScenesTableSql);
             console.log("scenes table OK");
             await db.exec(createPicturesTableSql);
             console.log("pictures table OK");
             await db.exec(createAudioTableSql);
             console.log("audio table ok");
+            await db.exec(createVideoTableSql);
+            console.log("video table ok");
+            await db.exec(createTextsTableSql);
+            console.log("texts table ok");
+            await db.exec(createModelsTableSql);
+            console.log("models table ok");
+            await db.exec(createObjectsTableSql);
+            console.log("objects table ok");
+            await db.exec(createGroupsTableSql);
+            console.log("groups table ok");
 
             const scenesQuery = {};
             const scenes = await RunDataQuery("scenes", "find", scenesQuery, null);
@@ -1601,6 +1688,136 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                     );
                     // console.log("scenes copy result " + result);
                 }
+            }
+            const videoQuery = {};
+            const videos = await RunDataQuery("video_items", "find", videoQuery, null);
+            console.log("videos length " + videos.length);
+            for (let i = 0; i < videos.length; i++) {
+                if (videos[i].otimestamp) {
+                    const video = videos[i];
+                    const result = await db.run('INSERT OR REPLACE INTO video(_id, title, filename, owner_userID, owner_userName, otimestamp, ofilesize, videoTags, videoData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                        video._id.toString(), 
+                        video.title, 
+                        video.filename,
+                        video.userID,
+                        video.userName,
+                        video.otimestamp,
+                        video.ofilesize, 
+                        JSON.stringify(video.tags),
+                        JSON.stringify(video)
+                    );
+                    // console.log("scenes copy result " + result);
+                }
+            }
+
+            const textsQuery = {};
+            const texts = await RunDataQuery("text_items", "find", textsQuery, null);
+            console.log("texts length " + texts.length);
+            for (let i = 0; i < texts.length; i++) {
+                if (texts[i].otimestamp) {
+                    const text = texts[i];
+                    const result = await db.run('INSERT OR REPLACE INTO texts(_id, title, owner_userID, owner_userName, otimestamp, textTags, textString, textData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+                        text._id.toString(), 
+                        text.title, 
+                        text.userID,
+                        text.createdByUserName,
+                        text.otimestamp,
+                        JSON.stringify(text.tags),
+                        text.textstring,
+                        JSON.stringify(text)
+                    );
+                    // console.log("scenes copy result " + result);
+                }
+            }
+
+
+            const modelsQuery = {};
+            const models = await RunDataQuery("models", "find", modelsQuery, null);
+            console.log("models length " + models.length);
+            for (let i = 0; i < models.length; i++) {
+                if (models[i].otimestamp) {
+                    const model = models[i];
+                    const result = await db.run('INSERT OR REPLACE INTO models(_id, name, filename, type, owner_userID, owner_userName, otimestamp, ofilesize, modelTags, modelData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                        model._id.toString(), 
+                        model.name,
+                        model.filename,
+                        model.item_type, 
+                        model.userID,
+                        model.username,
+                        model.otimestamp,
+                        model.ofilesize,
+                        JSON.stringify(model.tags),
+                        JSON.stringify(model)
+                    );
+                    // console.log("scenes copy result " + result);
+                }
+            }
+
+            const objectsQuery = {};
+            const objects = await RunDataQuery("obj_items", "find", objectsQuery, null);
+            console.log("objects length " + objects.length);
+            for (let i = 0; i < objects.length; i++) {
+                if (objects[i].otimestamp) {
+                    const object = objects[i];
+                    const result = await db.run('INSERT OR REPLACE INTO objects(_id, name, title, type, category, subcategory, class, owner_userID, owner_userName, otimestamp, objectTags, objectData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                        object._id.toString(), 
+                        object.name,
+                        object.title,
+                        object.type,
+                        object.category,
+                        object.subcategory, 
+                        object.class,
+                        object.userID,
+                        object.username,
+                        object.createdTimestamp,
+                        JSON.stringify(object.tags),
+                        JSON.stringify(object)
+                    );
+                    // console.log("scenes copy result " + result);
+                }
+            }
+
+            const groupsQuery = {};
+            const groups = await RunDataQuery("groups", "find", groupsQuery, null);
+            console.log("groups length " + groups.length);
+            for (let i = 0; i < groups.length; i++) {
+                    const group = groups[i];
+                    const result = await db.run('INSERT OR REPLACE INTO groups(_id, name, type, owner_userID, owner_userName, itemIDs, groupTags, groupData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+                        group._id.toString(), 
+                        group.name,
+                        group.type,
+                        group.userID,
+                        group.username,
+                        JSON.stringify(group.items),
+                        JSON.stringify(group.tags),
+                        JSON.stringify(group)
+                    );
+                    // console.log("scenes copy result " + result);
+                
+            }
+
+             const actionsQuery = {};
+            const actions = await RunDataQuery("groups", "find", actionsQuery, null);
+            console.log("groups length " + actions.length);
+            for (let i = 0; i < actions.length; i++) {
+                    const action = actions[i];
+                    const result = await db.run('INSERT OR REPLACE INTO groups(_id, name, type, owner_userID, owner_userName, itemIDs, groupTags, groupData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+                        action._id.toString(), 
+                        action.name,
+                        action.type,
+                        action.userID,
+                        action.username,
+                        JSON.stringify(action.tags),
+                        JSON.stringify(action)
+                    );
+                    // console.log("scenes copy result " + result);
+                
             }
             // const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
                           
@@ -1705,11 +1922,11 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
 
 
 
-
+            copying = false;
         } catch (e) {
 
             console.log("error copying data " + e);
-        
+            copying = false;
         }
     })();
 });
