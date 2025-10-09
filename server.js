@@ -1598,6 +1598,19 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                     groupData TEXT NOT NULL
                 );
             `;
+
+            const createActionsTableSql = `
+                CREATE TABLE IF NOT EXISTS actions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    _id TEXT NOT NULL UNIQUE,
+                    name TEXT,
+                    type TEXT,
+                    owner_userID TEXT,
+                    owner_userName TEXT,
+                    actionTags TEXT,
+                    actionData TEXT NOT NULL
+                );
+            `;
             await db.exec(createScenesTableSql);
             console.log("scenes table OK");
             await db.exec(createPicturesTableSql);
@@ -1614,6 +1627,9 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
             console.log("objects table ok");
             await db.exec(createGroupsTableSql);
             console.log("groups table ok");
+            await db.exec(createActionsTableSql);
+            console.log("actions table ok");
+
 
             const scenesQuery = {};
             const scenes = await RunDataQuery("scenes", "find", scenesQuery, null);
@@ -1801,13 +1817,13 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                 
             }
 
-             const actionsQuery = {};
-            const actions = await RunDataQuery("groups", "find", actionsQuery, null);
+            const actionsQuery = {};
+            const actions = await RunDataQuery("actions", "find", actionsQuery, null);
             console.log("groups length " + actions.length);
             for (let i = 0; i < actions.length; i++) {
                     const action = actions[i];
-                    const result = await db.run('INSERT OR REPLACE INTO groups(_id, name, type, owner_userID, owner_userName, itemIDs, groupTags, groupData'+
-                    ') VALUES (?, ?, ?, ?, ?, ?, ?, ?)', 
+                    const result = await db.run('INSERT OR REPLACE INTO actions(_id, name, type, owner_userID, owner_userName, actionTags, actionData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?)', 
                         action._id.toString(), 
                         action.name,
                         action.type,
@@ -1815,6 +1831,24 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                         action.username,
                         JSON.stringify(action.tags),
                         JSON.stringify(action)
+                    );
+                    // console.log("scenes copy result " + result);
+                
+            }
+            const inventoriesQuery = {};
+            const inventories = await RunDataQuery("inventories", "find", inventoriesQuery, null);
+            console.log("groups length " + inventories.length);
+            for (let i = 0; i < inventories.length; i++) {
+                    const inventory = inventories[i];
+                    const result = await db.run('INSERT OR REPLACE INTO actions(_id, name, type, owner_userID, owner_userName, inventoryData'+
+                    ') VALUES (?, ?, ?, ?, ?, ?, ?)', 
+                        inventory._id.toString(), 
+                        inventory.name,
+                        inventory.type,
+                        inventory.userID,
+                        inventory.username,
+                        JSON.stringify(inventory.tags),
+                        JSON.stringify(inventory)
                     );
                     // console.log("scenes copy result " + result);
                 
