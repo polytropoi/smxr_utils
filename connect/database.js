@@ -7,7 +7,7 @@ require('dotenv').config();
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 
 /////////// official mongo driver, going here...
-const uri = process.env.MONGO_URL || "";
+const uri = process.env.MONGO_LOCAL_URL || "";
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,

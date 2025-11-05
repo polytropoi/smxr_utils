@@ -28,8 +28,11 @@ import { ObjectId } from "mongodb";
 import { SqliteGuiNode } from 'sqlite-gui-node'; 
 import { RunDataQuery } from "./connect/database.js"; //connection happens here //todo put sqlite alt
 
+import {CopyObjectAWStoMinio, ReturnObjectExists } from "./connect/objectStore.js";
 
 import fs from 'fs/promises'
+
+const { spawn } = require('child_process');
 
 const { Readable, Writable } = require("node:stream");
 const fs_sync = require("node:fs");
@@ -527,33 +530,33 @@ export async function DeleteObject(bucket, key) { //s3.headObject == minio.statO
     }
 }
 
-export async function ReturnObjectExists(bucket, key) { //s3.headObject == minio.statObject
-    if (minioClient) {
-                //todo!
-    } else {
+// export async function ReturnObjectExists(bucket, key) { //s3.headObject == minio.statObject
+//     if (minioClient) {
+//                 //todo!
+//     } else {
 
-        const command = new HeadObjectCommand({
-            Bucket: bucket,
-            Key: key,
-        });
+//         const command = new HeadObjectCommand({
+//             Bucket: bucket,
+//             Key: key,
+//         });
         
-        try {
-            let data = await s3.send(command);
-            console.log("File exists: " + JSON.stringify(data));
-            return { exists: true, error: null };
-            // return true;
-        } catch (error) {
-            if (error.name === 'NotFound') {
-                console.log("File does not exist: " + key);
-                return { exists: false, error: null };
-                // return false;
-            }
-            console.error(`Error checking file existence: ${error}`);
-            return { exists: false, error };
-            // return false;
-        }
-    }
-}
+//         try {
+//             let data = await s3.send(command);
+//             console.log("File exists: " + JSON.stringify(data));
+//             // return { exists: true, error: null };
+//             return true;
+//         } catch (error) {
+//             if (error.name === 'NotFound') {
+//                 console.log("File does not exist: " + key);
+//                 return { exists: false, error: null };
+//                 return false;
+//             }
+//             console.error(`Error checking file existence: ${error}`);
+//             // return { exists: false, error };
+//             return false;
+//         }
+//     }
+// }
 
 export async function ReturnObjectMetadata(bucket, key) { //s3.headObject == minio.statObject
     if (minioClient) {
@@ -1451,12 +1454,94 @@ app.get('/usage_report/:user_id/:filetype', requiredAuthentication, domainadmin,
 });
 
 
+
+let dumping = false;
+app.get('/mongodump_from_cloud/', requiredAuthentication, function (req, res) {   
+
+    console.log("tryna mongodump");
+    if (!dumping) {
+        //     return;
+        // }
+        dumping = true;
+        // const outputDir = '~/stump/data/dump'; // Directory to save the dump
+
+        const args = [
+            // '--host', dbhost,
+            // '--port', dbport,
+            // '--db', dbname,
+            '--uri', process.env.MONGODUMP_FROM,
+            '--out', process.env.BACKUP_PATH,
+            // '--username', username,
+            // '--password', password
+        ];
+
+        const mongodumpProcess = spawn('mongodump', args);
+
+        mongodumpProcess.stdout.on('data', (data) => {
+            console.log(`stdout: ${data}`);
+        });
+
+        mongodumpProcess.stderr.on('data', (data) => {
+            console.error(`stderr: ${data}`);
+            // dumping = false;
+                    // res.send("dump error " + data);
+        });
+
+        mongodumpProcess.on('close', (code) => {
+            console.log(`mongodump process exited with code ${code}`);
+            dumping = false;
+            res.send("dump OK! " + code);
+        });
+    }
+});
+
+let restoring = false;
+app.get('/mongorestore_to_local/', requiredAuthentication, function (req, res) {   
+    console.log("tryna mongorestore..");
+    if (!restoring) {
+    //     return;
+    // }
+    restoring = true;
+
+        const args = [
+            '--db', process.env.DATABASE_NAME,
+            '--drop', // Optional: drops existing collections before restoring
+            '--dir', process.env.BACKUP_PATH,
+            '--host', 'localhost',
+            '--port', 27017
+        ];
+
+        const mongorestoreProcess = spawn('mongorestore', args);
+
+        mongorestoreProcess.stdout.on('data', (data) => {
+            console.log(`stdout: ${data}`);
+        });
+
+        mongorestoreProcess.stderr.on('data', (data) => {
+            console.error(`stderr: ${data}`);
+        });
+
+        mongorestoreProcess.on('close', (code) => {
+            if (code === 0) {
+                console.log(`Database '${process.env.DATABASE_NAME}' restored successfully from '${process.env.BACKUP_PATH}'`);
+            } else {
+                console.error(`mongorestore process exited with code ${code}`);
+            }
+            restoring = false;
+            res.send("restore ok " + code);
+        });
+    } 
+    
+
+});
+
+
 let copying = false;
-app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo data into sqlite!
+app.get('/copydata_sqlite/', requiredAuthentication, function (req, res) { //copy mongo data into sqlite!
 
     if (copying) {
-        return;
-    }
+    //     return;
+    // }
     (async () => {
 
         try {
@@ -1603,8 +1688,8 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                 CREATE TABLE IF NOT EXISTS actions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     _id TEXT NOT NULL UNIQUE,
-                    name TEXT,
-                    type TEXT,
+                    actionName TEXT,
+                    actionType TEXT,
                     owner_userID TEXT,
                     owner_userName TEXT,
                     actionTags TEXT,
@@ -1819,14 +1904,14 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
 
             const actionsQuery = {};
             const actions = await RunDataQuery("actions", "find", actionsQuery, null);
-            console.log("groups length " + actions.length);
+            console.log("actions length " + actions.length);
             for (let i = 0; i < actions.length; i++) {
                     const action = actions[i];
-                    const result = await db.run('INSERT OR REPLACE INTO actions(_id, name, type, owner_userID, owner_userName, actionTags, actionData'+
+                    const result = await db.run('INSERT OR REPLACE INTO actions(_id, actionName, actionType, owner_userID, owner_userName, actionTags, actionData'+
                     ') VALUES (?, ?, ?, ?, ?, ?, ?)', 
                         action._id.toString(), 
-                        action.name,
-                        action.type,
+                        action.actionName,
+                        action.actionType,
                         action.userID,
                         action.username,
                         JSON.stringify(action.tags),
@@ -1835,24 +1920,26 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
                     // console.log("scenes copy result " + result);
                 
             }
-            const inventoriesQuery = {};
-            const inventories = await RunDataQuery("inventories", "find", inventoriesQuery, null);
-            console.log("groups length " + inventories.length);
-            for (let i = 0; i < inventories.length; i++) {
-                    const inventory = inventories[i];
-                    const result = await db.run('INSERT OR REPLACE INTO actions(_id, name, type, owner_userID, owner_userName, inventoryData'+
-                    ') VALUES (?, ?, ?, ?, ?, ?, ?)', 
-                        inventory._id.toString(), 
-                        inventory.name,
-                        inventory.type,
-                        inventory.userID,
-                        inventory.username,
-                        JSON.stringify(inventory.tags),
-                        JSON.stringify(inventory)
-                    );
-                    // console.log("scenes copy result " + result);
+
+            // const inventoriesQuery = {};
+            // const inventories = await RunDataQuery("inventories", "find", inventoriesQuery, null);
+            // console.log("inventories length " + inventories.length);
+            // for (let i = 0; i < inventories.length; i++) {
+            //         const inventory = inventories[i];
+            //         const result = await db.run('INSERT OR REPLACE INTO actions(_id, name, type, owner_userID, owner_userName, inventoryData'+
+            //         ') VALUES (?, ?, ?, ?, ?, ?, ?)', 
+            //             inventory._id.toString(), 
+            //             inventory.name,
+            //             inventory.type,
+            //             inventory.userID,
+            //             inventory.username,
+            //             JSON.stringify(inventory.tags),
+            //             JSON.stringify(inventory)
+            //         );
+            //         // console.log("scenes copy result " + result);
                 
-            }
+            // }
+
             // const stmt = db.prepare('INSERT OR REPLACE INTO scenes (' +
                           
             //                 '_id, short_id, otimestamp, sceneTitle, sceneDomain, sceneOwner_userID, sceneOwner_userName, sceneTags, sceneAlias, sceneStickyness, sceneType,'+
@@ -1956,13 +2043,95 @@ app.get('/copydata/', requiredAuthentication, function (req, res) { //copy mongo
 
 
 
-            copying = false;
-        } catch (e) {
+                copying = false;
+                console.log("copy ok");
+                res.send("OK!");
+            } catch (e) {
 
-            console.log("error copying data " + e);
-            copying = false;
-        }
-    })();
+                console.log("error copying data " + e);
+                copying = false;
+                res.send("error " + e);
+            }
+        })();
+    }
+});
+
+let copyingScene = false;
+app.get('/copyscene/:_id', requiredAuthentication, function (req, res) {
+
+    if (!copyingScene) {
+        copyingScene = true;
+
+        (async () => {
+
+            try {
+        //
+                const sceneQuery = {'short_id': req.params._id};
+                const sceneData = await RunDataQuery("scenes", "findOne", sceneQuery, null);
+                if (sceneData.scenePictures != null && sceneData.scenePictures.length > 0) {
+                    // sceneData.scenePictures.forEach(function (picture) {
+                    for (let i = 0; i < sceneData.scenePictures.length; i++) {
+                        console.log("tryna copy a picture " + sceneData.scenePictures[i]);
+                        var p_id = ObjectId.createFromHexString(sceneData.scenePictures[i]); //convert to binary to search by _id beloiw
+                        // requestedPictureItems.push(p_id); //populate array
+                        const picquery = {_id: p_id};
+                        const picture_item = await RunDataQuery("image_items", "findOne", picquery);
+                        if (picture_item) {
+               
+                            console.log("gotsa picture " + picture_item.filename);
+                            var thumbName = 'thumb.' + picture_item.filename;
+                            var quarterName = 'quarter.' + picture_item.filename;
+                            var halfName = 'half.' + picture_item.filename;
+                            var standardName = 'standard.' + picture_item.filename;
+                            var originalName = 'original.' + picture_item.filename;
+                            const thumbkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + thumbName;
+                            // const quarterkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + thumbName;
+                            const halfkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + halfName;
+                            const standardkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + standardName;
+                            const originalkeyold = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + originalName;
+                            const originalkey = "users/" + picture_item.userID + "/pictures/originals/" + picture_item._id + "." + originalName;
+
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) {
+                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, thumbkey, process.env.ROOT_BUCKET_NAME, thumbkey);
+                            } else {
+                                console.log("object not found at AWS " + thumbkey);
+                            }
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
+                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, halfkey, process.env.ROOT_BUCKET_NAME, halfkey);
+                            } else {
+                                console.log("object not found at AWS " + halfkey);
+                            }
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
+                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, standardkey, process.env.ROOT_BUCKET_NAME, standardkey);
+                            } else {
+                                console.log("object not found at AWS " + standardkey);
+                            }
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkeyold)) {
+                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkeyold, process.env.ROOT_BUCKET_NAME, originalkey);
+                            } else {
+                                console.log("object not found at AWS " + originalkeyold);
+                            }
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkey)) {
+                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkey, process.env.ROOT_BUCKET_NAME, originalkey);
+                            } else {
+                                console.log("object not found at AWS " + originalkey);
+                            }
+
+                            //                         const urlThumb = await ReturnPresignedUrl(process.env.ROOT_BUCKET_NAME, "users/" + picture_items[i].userID + "/pictures/" + picture_items[i]._id + "." + thumbName, 6000 );
+                            // const urlQuarter = await ReturnPresignedUrl(process.env.ROOT_BUCKET_NAME, "users/" + picture_items[i].userID + "/pictures/" + picture_items[i]._id + "." + quarterName, 6000 );
+                            // const urlHalf = await ReturnPresignedUrl(process.env.ROOT_BUCKET_NAME, "users/" + picture_items[i].userID + "/pictures/" + picture_items[i]._id + "." + halfName, 6000 );
+                            // const urlStandard = await ReturnPresignedUrl(process.env.ROOT_BUCKET_NAME, "users/" + picture_items[i].userID + "/pictures/" + picture_items[i]._id + "." + standardName, 6000 );
+                                // });
+                        }
+                    }
+                }
+                
+            } catch (e) {
+                res.send("error copying scene " + e);
+            }
+            
+        })();
+    }
 });
 
 function toCSV(json) {
