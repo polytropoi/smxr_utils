@@ -76,7 +76,7 @@ export async function CopyObjectAWStoMinio(awsBucketName,
     if (!response.Body) {
       throw new Error("Object body not found in AWS S3.");
     }
-    console.log("gotsa pic body content type ");
+    // console.log("gotsa pic body content type ");
     // 2. Upload the object to MinIO
     // const putObjectParams = {
     //   Bucket: minioBucketName,
@@ -85,14 +85,14 @@ export async function CopyObjectAWStoMinio(awsBucketName,
     //   // ContentType: ContentType, // Preserve content type
     // };
     // await minioClient.send(new PutObjectCommand(putObjectParams));
-        minioClient.putObject(minioBucketName, minioObjectKey, response.Body, (err, etag) => {
-        if (err) return console.log('Error uploading object.', err);
-        console.log('Object uploaded successfully, ETag:', etag);
+    minioClient.putObject(minioBucketName, minioObjectKey, response.Body, (err, etag) => {
+      if (err) return console.log('Error uploading object.', err);
+      // console.log('Object uploaded successfully, ETag:', etag);
+        console.log(`Successfully copied object to MinIO as '${minioObjectKey}'.`);
     });
+    // });
 
-    console.log(
-      `Successfully copied object '${awsObjectKey}' from AWS S3 to MinIO as '${minioObjectKey}'.`
-    );
+   
     // return "copied " + awsObjectKey + "to minio!";
   } catch (error) {
     console.error("Error copying object:", error);
@@ -191,6 +191,20 @@ export async function DeleteObject(bucket, key) { //s3.headObject == minio.statO
     }
 }
 
+export async function ReturnMinioObjectExists(bucket, object) { //s3.headObject == minio.statObject
+ try {
+        await minioClient.statObject(bucket, object);
+        return true; // Object exists
+    } catch (err) {
+        if (err.code === 'NoSuchKey' || err.code === 'Not Found' || err.code === 'NotFound') {
+            return false; // Object does not exist
+        } else {
+          throw err; // Re-throw other errors
+        }
+       
+    }
+}
+
 export async function ReturnObjectExists(bucket, key) { //s3.headObject == minio.statObject
     // if (minioClient) {
     //             //todo!
@@ -208,7 +222,7 @@ export async function ReturnObjectExists(bucket, key) { //s3.headObject == minio
             return true;
         } catch (error) {
             if (error.name === 'NotFound') {
-                console.log("File does not exist: " + key);
+                // console.log("File does not exist: " + key);
                 // return { exists: false, error: null };
                 return false;
             }

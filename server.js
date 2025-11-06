@@ -28,7 +28,7 @@ import { ObjectId } from "mongodb";
 import { SqliteGuiNode } from 'sqlite-gui-node'; 
 import { RunDataQuery } from "./connect/database.js"; //connection happens here //todo put sqlite alt
 
-import {CopyObjectAWStoMinio, ReturnObjectExists } from "./connect/objectStore.js";
+import {CopyObjectAWStoMinio, ReturnObjectExists, ReturnMinioObjectExists } from "./connect/objectStore.js";
 
 import fs from 'fs/promises'
 
@@ -2091,43 +2091,323 @@ app.get('/copyscene/:_id', requiredAuthentication, function (req, res) {
                             const originalkeyold = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + originalName;
                             const originalkey = "users/" + picture_item.userID + "/pictures/originals/" + picture_item._id + "." + originalName;
 
-                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) {
-                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, thumbkey, process.env.ROOT_BUCKET_NAME, thumbkey);
+                           if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //check the file is at aws
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //don't copy if it's already been copied
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, thumbkey, process.env.ROOT_BUCKET_NAME, thumbkey); //copy that stuff!
+                                } else {
+                                    console.log("object already copied to minio " + thumbkey)
+                                }
                             } else {
                                 console.log("object not found at AWS " + thumbkey);
                             }
                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
-                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, halfkey, process.env.ROOT_BUCKET_NAME, halfkey);
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, halfkey, process.env.ROOT_BUCKET_NAME, halfkey);
+                                } else {
+                                    console.log("object already copied to minio " + halfkey)
+                                }
                             } else {
                                 console.log("object not found at AWS " + halfkey);
                             }
                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
-                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, standardkey, process.env.ROOT_BUCKET_NAME, standardkey);
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, standardkey, process.env.ROOT_BUCKET_NAME, standardkey);
+                                } else {
+                                    console.log("object already copied to minio " + standardkey)
+                                }
                             } else {
                                 console.log("object not found at AWS " + standardkey);
                             }
                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkeyold)) {
-                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkeyold, process.env.ROOT_BUCKET_NAME, originalkey);
+                                if (await !ReturnMinioObjectExists(rpocess.env.ROOT_BUCKET_NAME, originalkeyold)) {
+                                 await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkeyold, process.env.ROOT_BUCKET_NAME, originalkey);
+                                } else {
+                                    console.log("object already copied to minio " + originalkeyold)
+                                }
                             } else {
                                 console.log("object not found at AWS " + originalkeyold);
                             }
                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkey)) {
-                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkey, process.env.ROOT_BUCKET_NAME, originalkey);
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, originalkey)) {
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkey, process.env.ROOT_BUCKET_NAME, originalkey);
+                                } else {
+                                    console.log("object already copied to minio " + originalkey)
+                                }
+                            } else {
+                                console.log("object not found at AWS " + originalkey);
+                            }
+                           
+                           
+                            
+                        }
+                    }
+                }
+                if (sceneData.scenePictureGroups != null && sceneData.scenePictureGroups.length > 0) {
+                    console.log("tryna get picture groups " +  sceneData.scenePictureGroups)
+                    const pg_ids = sceneData.scenePictureGroups.map(convertStringToObjectID);
+                    const pgquery = {"_id": {$in : pg_ids}};
+
+                    const groups = await RunDataQuery("groups", "find", pgquery);
+                    // console.log("getting ")
+                    for (let group of groups) { 
+                        let picGroup = {};
+                        picGroup._id = group._id;
+                        picGroup.name = group.name;
+                        picGroup.userID = group.userID;
+                        let p_ids = [];
+                        if (Array.isArray(group.items)) {
+                            p_ids = group.items.map(convertStringToObjectID);
+                        } else {
+                            p_ids.push(ObjectId.createFromHexString(group.items.toString()));
+                        }
+                        // const p_ids = group.items; //.map(convertStringToObjectID);
+                        console.log("about to get picgroup items : "+ p_ids.length);
+                        const picquery = {"_id": {$in : p_ids}};
+                        let images = await RunDataQuery("image_items", "find", picquery);
+                    
+                        for (let picture_item of images) { //jack in a signed url for each
+                            // console.log("gots a pic in pic group w/ image.orientation " + image.filename);
+                            var thumbName = 'thumb.' + picture_item.filename;
+                            var halfName = 'half.' + picture_item.filename;
+                            var standardName = 'standard.' + picture_item.filename;
+                            var originalName = 'original.' + picture_item.filename;
+                             const thumbkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + thumbName;
+                            // const quarterkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + thumbName;
+                            const halfkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + halfName;
+                            const standardkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + standardName;
+                            const originalkeyold = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + originalName;
+                            const originalkey = "users/" + picture_item.userID + "/pictures/originals/" + picture_item._id + "." + originalName;
+
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //check the file is at aws
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //don't copy if it's already been copied
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, thumbkey, process.env.ROOT_BUCKET_NAME, thumbkey); //copy that stuff!
+                                } else {
+                                    console.log("object already copied to minio " + thumbkey);
+                                }
+                            } else {
+                                console.log("object not found at AWS " + thumbkey);
+                            }
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, halfkey, process.env.ROOT_BUCKET_NAME, halfkey);
+                                } else {
+                                    console.log("object already copied to minio " + halfkey);
+                                }
+                            } else {
+                                console.log("object not found at AWS " + halfkey);
+                            }
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, standardkey, process.env.ROOT_BUCKET_NAME, standardkey);
+                                } else {
+                                    console.log("object already copied to minio " + standardkey);
+                                }
+                            } else {
+                                console.log("object not found at AWS " + standardkey);
+                            }
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkeyold)) {
+                                if (await !ReturnMinioObjectExists(rpocess.env.ROOT_BUCKET_NAME, originalkeyold)) {
+                                 await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkeyold, process.env.ROOT_BUCKET_NAME, originalkey);
+                                } else {
+                                    console.log("object already copied to minio " + originalkeyold);
+                                }
+                            } else {
+                                // console.log("object not found at AWS " + originalkeyold);
+                            }
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkey)) {
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, originalkey)) {
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkey, process.env.ROOT_BUCKET_NAME, originalkey);
+                                } else {
+                                    console.log("object already copied to minio " + originalkey);
+                                }
                             } else {
                                 console.log("object not found at AWS " + originalkey);
                             }
 
-                            //                         const urlThumb = await ReturnPresignedUrl(process.env.ROOT_BUCKET_NAME, "users/" + picture_items[i].userID + "/pictures/" + picture_items[i]._id + "." + thumbName, 6000 );
-                            // const urlQuarter = await ReturnPresignedUrl(process.env.ROOT_BUCKET_NAME, "users/" + picture_items[i].userID + "/pictures/" + picture_items[i]._id + "." + quarterName, 6000 );
-                            // const urlHalf = await ReturnPresignedUrl(process.env.ROOT_BUCKET_NAME, "users/" + picture_items[i].userID + "/pictures/" + picture_items[i]._id + "." + halfName, 6000 );
-                            // const urlStandard = await ReturnPresignedUrl(process.env.ROOT_BUCKET_NAME, "users/" + picture_items[i].userID + "/pictures/" + picture_items[i]._id + "." + standardName, 6000 );
-                                // });
+                          
                         }
                     }
                 }
-                
+                if (sceneData.scenePostcards != null && sceneData.scenePostcards.length > 0) {
+                    
+                    // const postcardID = sceneData.scenePostcards[0]; //whatever, just one for now
+                    console.log("gots postcards " + sceneData.scenePostcards);
+                    for (let i = 0; i < sceneData.scenePostcards.length; i++) {
+
+                        const p_id = ObjectId.createFromHexString(sceneData.scenePostcards[i]);
+                        const picturequery = {"_id": p_id};
+                        const picture_item = await RunDataQuery("image_items", "findOne", picturequery);
+                        const thumbkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + ".thumb." + picture_item.filename;
+                        const halfkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + ".half." + picture_item.filename;
+                        const standardkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + ".standard." + picture_item.filename;
+
+                         if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //check the file is at aws
+                                if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //don't copy if it's already been copied
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, thumbkey, process.env.ROOT_BUCKET_NAME, thumbkey); //copy that stuff!
+                                } else {
+                                    console.log("object already copied to minio " + thumbkey)
+                                }
+                        } else {
+                            console.log("object not found at AWS " + thumbkey);
+                        }
+                        if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
+                            if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
+                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, halfkey, process.env.ROOT_BUCKET_NAME, halfkey);
+                            } else {
+                                console.log("object already copied to minio " + halfkey)
+                            }
+                        } else {
+                            console.log("object not found at AWS " + halfkey);
+                        }
+                        if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
+                            if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
+                                await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, standardkey, process.env.ROOT_BUCKET_NAME, standardkey);
+                            } else {
+                                console.log("object already copied to minio " + standardkey)
+                            }
+                        } else {
+                            console.log("object not found at AWS " + standardkey);
+                        }
+                                               
+                    }
+                }
+                var triggerOID = ObjectId.isValid(sceneData.sceneTriggerAudioID) ? ObjectId.createFromHexString(sceneData.sceneTriggerAudioID) : "";
+                var ambientOID = ObjectId.isValid(sceneData.sceneAmbientAudioID) ? ObjectId.createFromHexString(sceneData.sceneAmbientAudioID) : "";
+                var primaryOID = ObjectId.isValid(sceneData.scenePrimaryAudioID) ? ObjectId.createFromHexString(sceneData.scenePrimaryAudioID) : "";
+                let requestedAudioItems = [ triggerOID, ambientOID, primaryOID];
+
+                let audioGroups = [];
+                audioGroups.push(...sceneData.sceneTriggerAudioGroups);
+                audioGroups.push(...sceneData.sceneAmbientAudioGroups);
+                audioGroups.push(...sceneData.scenePrimaryAudioGroups);
+
+               const a_ids = audioGroups.map(convertStringToObjectID);
+                console.log("audioGroups " + audioGroups);
+                if (audioGroups.length) {
+                    
+                     const groupsquery = {"_id": {$in: a_ids}};
+                    let agroups = await RunDataQuery("groups", "find", groupsquery);
+                    for (let group of agroups) {
+                        let p_ids = [];
+                        if (Array.isArray(group.items)) {
+                            p_ids = group.items.map(convertStringToObjectID);
+                        } else {
+                            p_ids.push(ObjectId.createFromHexString(group.items.toString()));
+                        }
+                        requestedAudioItems.push(...p_ids); //spread operator, yes
+                    }
+                }
+                //nahh/;/
+                // if (sceneData.sceneTriggerAudioGroups) {
+                //     // audioGroups.push(sceneData.sceneTriggerAudioGroups);
+                //     const groupsquery = {"_id": {$in: sceneData.sceneTriggerAudioGroups }};
+                //     let triggergroups = await RunDataQuery("groups", "find", groupsquery);
+                //     if (triggergroups && triggergroups.length) {
+                //         console.log("triggergroups " + triggergroups)
+                //         for (group in triggergroups) {
+                //             const groupquery = {"_id": group._id};
+                //             let theGroup = await RunDataQuery("groups", "findOne", groupquery);
+
+                //             let p_ids = [];
+                //             if (Array.isArray(theGroup.items)) {
+                //                 p_ids = theGroup.items.map(convertStringToObjectID);
+                //             } else {
+                //                 p_ids.push(ObjectId.createFromHexString(theGroup.items.toString()));
+                //             }
+                //             requestedAudioItems.push(...p_ids); //spread operator, yes
+                //         }
+                //     }
+
+                // }
+                // if (sceneData.sceneAmbientAudioGroups) {
+                //      const groupsquery = {"_id": {$in: sceneData.sceneAmbientAudioGroups }};
+                //     let ambientgroups = await RunDataQuery("groups", "find", groupsquery);
+                //     if (ambientgroups && ambientgroups.length) {
+                //         for (group in ambientgroups) {
+                //             const groupquery = {"_id": group._id};
+                //             let theGroup = await RunDataQuery("groups", "findOne", groupquery);
+
+                //             let p_ids = [];
+                //             if (Array.isArray(theGroup.items)) {
+                //                 p_ids = theGroup.items.map(convertStringToObjectID);
+                //             } else {
+                //                 p_ids.push(ObjectId.createFromHexString(theGroup.items.toString()));
+                //             }
+                //             requestedAudioItems.push(...p_ids); //spread operator, yes
+                //         }
+                //     }
+                // }
+                // if (sceneData.scenePrimaryAudioGroups) {
+                //      const groupsquery = {"_id": {$in: sceneData.scenePrimaryAudioGroups }};
+                //     let primarygroups = await RunDataQuery("groups", "find", groupsquery);
+                //     if (primarygroups && primarygroups.length) {
+                //         for (group in primarygroups) {
+                //             const groupquery = {"_id": group._id};
+                //             let theGroup = await RunDataQuery("groups", "findOne", groupquery);
+
+                //             let p_ids = [];
+                //             if (Array.isArray(theGroup.items)) {
+                //                 p_ids = theGroup.items.map(convertStringToObjectID);
+                //             } else {
+                //                 p_ids.push(ObjectId.createFromHexString(theGroup.items.toString()));
+                //             }
+                //             requestedAudioItems.push(...p_ids); //spread operator, yes
+                //         }
+                //     }
+                // }
+
+                console.log("requested audio items all together " + requestedAudioItems);
+                const audioquery = {"_id": {$in: requestedAudioItems }};
+                let audio_items = await RunDataQuery("audio_items", "find", audioquery);
+
+                for (var i = 0; i < audio_items.length; i++) {
+                    console.log("audio_item: ", audio_items[i].filename);
+                    var item_string_filename = JSON.stringify(audio_items[i].filename);
+                    item_string_filename = item_string_filename.replace(/\"/g, "");
+                    var item_string_filename_ext = getExtension(item_string_filename);
+                    var expiration = new Date();
+                    expiration.setMinutes(expiration.getMinutes() + 1000);
+                    var baseName = path.basename(item_string_filename, (item_string_filename_ext));
+                    var mp3Name = "users/" + audio_items[i].userID + "/audio/" + audio_items[i]._id + "." + baseName + '.mp3';
+                    var oggName = "users/" + audio_items[i].userID + "/audio/" + audio_items[i]._id + "." + baseName + '.ogg';
+                    var pngName = "users/" + audio_items[i].userID + "/audio/" + audio_items[i]._id + "." + baseName + '.png';
+
+
+                    if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, mp3Name)) {
+                        if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, mp3Name) == false) { 
+                            await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, mp3Name, process.env.ROOT_BUCKET_NAME, mp3Name);
+                        } else {
+                            console.log("object already copied to minio " + mp3Name);
+                        }
+                    } else {
+                        console.log("object not found at AWS " + mp3Name);
+                    }
+                    if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, oggName)) {
+                        if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, oggName)  == false) { 
+                        await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, oggName, process.env.ROOT_BUCKET_NAME, oggName);
+                        } else {
+                            console.log("object already copied to minio " + oggName);
+                        }
+                    } else {
+                        console.log("object not found at AWS " + oggName);
+                    }
+                    if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, pngName)) {
+                        if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, pngName) == false) { 
+                            await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, mp3Name, process.env.ROOT_BUCKET_NAME, pngName);
+                        } else {
+                            console.log("object already copied to minio " + pngName);
+                        }
+                    } else {
+                        console.log("object not found at AWS " + pngName);
+                    }
+
+                }
+
+              
+                   // copyingScene = false;
             } catch (e) {
                 res.send("error copying scene " + e);
+                copyingScene = false;
             }
             
         })();
