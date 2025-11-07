@@ -370,13 +370,25 @@ export function getExtension(filename) {
     return (i < 0) ? '' : filename.substr(i);
 }
 
+function returnType(variable) {
+    console.log("type is " + typeof variable);
+  return typeof variable;
+}
+
 export function convertStringToObjectID (stringID) {
-    if (ObjectId.isValid(stringID)) {
-        return ObjectId.createFromHexString(stringID);
+    if (returnType(stringID) === "string" && stringID.length == 24) { 
+    // stringID = stringID.toString();
+        if (ObjectId.isValid(stringID)) {
+            return ObjectId.createFromHexString(stringID);
+        } else {
+            return null;
+        }
     } else {
-        return null;
+        if (returnType(stringID) === "object") {
+            return stringID; //it's already a mongoID  
+        }
+          
     }
-    
 }
 
 export function removeDuplicates(arr){
@@ -2123,7 +2135,11 @@ app.get('/copyscene/:_id', requiredAuthentication, function (req, res) {
                         const modelsquery = {"_id": {$in: model_ids}};
                         let models = await RunDataQuery("models", "find", modelsquery);
                         for (let model of models) {
-                            const modelkey = "users/" + model.userID + "/gltf/" + model.filename;
+
+                            let modelkey = "users/" + model.userID + "/gltf/" + model.filename;
+                            if (model.item_type == "splat") {
+                                modelkey = "users/" + model.userID + "/splat/" + model.filename;
+                            }
                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, modelkey)) { //check the file is at aws
                                 if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, modelkey) == false) { //don't copy if it's already been copied
                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, modelkey, process.env.ROOT_BUCKET_NAME, modelkey); //copy that stuff!
@@ -2144,7 +2160,10 @@ app.get('/copyscene/:_id', requiredAuthentication, function (req, res) {
                     const modelsquery = {"_id": {$in: m_ids}};
                     let models = await RunDataQuery("models", "find", modelsquery);
                     for (let model of models) {
-                        const modelkey = "users/" + model.userID + "/gltf/" + model.filename;
+                        let modelkey = "users/" + model.userID + "/gltf/" + model.filename;
+                        if (model.item_type == "splat") {
+                            modelkey = "users/" + model.userID + "/splat/" + model.filename;
+                        }
                         if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, modelkey)) { //check the file is at aws
                             if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, modelkey) == false) { //don't copy if it's already been copied
                                 await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, modelkey, process.env.ROOT_BUCKET_NAME, modelkey); //copy that stuff!
@@ -2231,8 +2250,16 @@ app.get('/copyscene/:_id', requiredAuthentication, function (req, res) {
                     }
                 }
                 if (sceneData.scenePictureGroups != null && sceneData.scenePictureGroups.length > 0) {
-                    console.log("tryna get picture groups " +  sceneData.scenePictureGroups)
-                    const pg_ids = sceneData.scenePictureGroups.map(convertStringToObjectID);
+
+                    let pg_ids = [];
+                    console.log("tryna get picture groups " +  sceneData.scenePictureGroups + " is array " + Array.isArray(sceneData.scenePictureGroups));
+                    if (Array.isArray(sceneData.scenePictureGroups)) { //sometimes it's not an array... !?!
+
+                        pg_ids = sceneData.scenePictureGroups.map(convertStringToObjectID);
+                    } else {
+                        pg_ids.push(convertStringToObjectID(sceneData.scenePictureGroups));
+                    }
+
                     const pgquery = {"_id": {$in : pg_ids}};
 
                     const groups = await RunDataQuery("groups", "find", pgquery);
@@ -2435,9 +2462,49 @@ app.get('/copyscene/:_id', requiredAuthentication, function (req, res) {
                 }
             
 
+                if (sceneData.sceneVideoGroups != null && sceneData.sceneVideoGroups.length > 0) {
+                    console.log("tryna get video groups " +  sceneData.sceneVideoGroups);
+                    const vidgroups_ids = sceneData.sceneVideoGroups.map(convertStringToObjectID);
+                    // const vidgroupsquery = {"_id": {$in : sceneData.sceneVideoGroups}};
+                    const vidgroupsquery = {"_id": {$in : vidgroups_ids}};
+                    const groups = await RunDataQuery("groups", "find", vidgroupsquery);
+                     for (let group of groups) { 
+                        let vidGroup = {};
+                        // picGroup._id = group._id;
+                        // picGroup.name = group.name;
+                        // picGroup.userID = group.userID;
+                        let vid_ids = [];
+                        if (Array.isArray(group.items)) {
+                            vid_ids = group.items.map(convertStringToObjectID);
+                        } else {
+                            vid_ids.push(ObjectId.createFromHexString(group.items.toString()));
+                        }
+                        // const p_ids = group.items; //.map(convertStringToObjectID);
+                        console.log("about to get vidgroup items : "+ vid_ids.length);
+                        const vidsquery = {"_id": {$in : vid_ids}};
+                        let videos = await RunDataQuery("video_items", "find", vidsquery);
+                    
+                        for (let video of videos) { //jack in a signed url for each
+                            
+                            const vidkey = 'users/' + video.userID + '/video/' + video._id + '/' + video._id + '.' + video.filename;
+                            console.log("gotsa video " + vidkey);
+                            if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, vidkey)) {
+                                if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, vidkey) == false) { 
+                                    await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, vidkey, process.env.ROOT_BUCKET_NAME, vidkey);
+                                } else {
+                                    console.log("file already copied to minio " + vidkey);
+                                }
+                            } else {
+                                console.log("object not found at AWS " + vidkey);
+                            }
+
+                        }
+                    }
+                }
+
               
-                   copyingScene = false;
-                   res.redirect("/main");
+                copyingScene = false;
+                res.redirect("/main");
             } catch (e) {
                 console.log("error copying " + e);
                 res.send("error copying scene " + e);
