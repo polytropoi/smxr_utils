@@ -31,7 +31,7 @@ export async function RunDataQuery(coll,type,query,update,sort) {  //TODO pass i
     if (sort) {
         s = "sorted";
     }
-    console.log("tryna RunDataQuery " + coll + " " + type  + " " + q + " " + u + " " + s);
+    console.log("RunDataQuery " + coll + " " + type  + " " + q + " " + u + " " + s);
     switch  (type) {
 
         case "find": //i.e. more than one
