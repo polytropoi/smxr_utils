@@ -6,6 +6,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import * as minio from 'minio'
 
+import chalk from 'chalk';
+
 import {
     S3Client, 
     S3ServiceException, 
@@ -27,7 +29,7 @@ const s3 = new S3Client({
     }
 });
 
-//  const minioClient = new S3Client({
+//  const minioClient = new S3Client({ //hallucination?
 //   region: "us-east-1", 
 //         // endpoint: process.env.MINIOENDPOINT, // Replace with your MinIO endpoint
 //         endpoint: "http://localhost:9000", 
@@ -74,7 +76,7 @@ export async function CopyObjectAWStoMinio(awsBucketName,
     );
 
     if (!response.Body) {
-      throw new Error("Object body not found in AWS S3.");
+      throw new Error(chalk.red("Object body not found in AWS S3."));
     }
     // console.log("gotsa pic body content type ");
     // 2. Upload the object to MinIO
@@ -86,16 +88,16 @@ export async function CopyObjectAWStoMinio(awsBucketName,
     // };
     // await minioClient.send(new PutObjectCommand(putObjectParams));
     minioClient.putObject(minioBucketName, minioObjectKey, response.Body, (err, etag) => {
-      if (err) return console.log('Error uploading object.', err);
+      if (err) return console.log(chalk.red('Error uploading object.', err));
       // console.log('Object uploaded successfully, ETag:', etag);
-        console.log(`Successfully copied object to MinIO as '${minioObjectKey}'.`);
+        console.log(chalk.cyan(`Successfully copied object to MinIO as '${minioObjectKey}'.`));
     });
     // });
 
    
     // return "copied " + awsObjectKey + "to minio!";
   } catch (error) {
-    console.error("Error copying object:", error);
+    console.error(chalk.cyan(chalk.red("Error copying object:", error)));
   }
 }
 
@@ -374,7 +376,7 @@ export async function CopyObject(targetBucket, copySource, key) {
                 // return { exists: false, error: null };
                 return error;
             }
-            console.error(`Error copying: ${error}`);
+            console.error(chalk.red(`Error copying: ${error}`));
             // return { exists: false, error };
             return error;
         }

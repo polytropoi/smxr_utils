@@ -4,6 +4,7 @@ import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 require('dotenv').config();
 
+import chalk from 'chalk';
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 
 /////////// official mongo driver, going here...
@@ -31,7 +32,7 @@ export async function RunDataQuery(coll,type,query,update,sort) {  //TODO pass i
     if (sort) {
         s = "sorted";
     }
-    console.log("RunDataQuery " + coll + " " + type  + " " + q + " " + u + " " + s);
+    console.log(chalk.white("RunDataQuery " + coll + " " + type  + " " + q + " " + u + " " + s));
     switch  (type) {
 
         case "find": //i.e. more than one
