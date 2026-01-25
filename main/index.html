@@ -364,21 +364,41 @@
 
       <div id="encodeVideoPanelLocalPath" style="display:none;" class="container-fluid"> 
         <form id="videoLocalPathForm">
-          Select encoding type: <br>
-          <label for="videoPathInput" class="form-label">SD (720)</label>
-          <input class="mxy-6" type="radio" name="type" value="SD">
+          <div id="encodingInput">
+            Select encoding type: <br>
+            <label for="videoPathInput" class="form-label">SD (720)</label>
+            <input class="mxy-6" type="radio" name="type" value="SD">
+            <br>
+            <label for="videoPathInput" class="form-label">HD (1080)</label>
+            <input class="mxy-6"  type="radio" name="type" value="HD">
+            <br>
+
+            <label for="videoPathInput" class="form-label">360 (4K)</label>
+            <input class="mxy-6"  type="radio" name="type" value="360">
+            <br>
+          </div>
+         
+
+          
+
+        <div id="aspectInput"></div>
+          Select aspect type: <br>
+          <label for="videoAspect" class="form-label">Landscape</label>
+          <input class="mxy-6" type="radio" name="aspect" value="Landscape">
           <br>
-          <label for="videoPathInput" class="form-label">HD (1080)</label>
-          <input class="mxy-6"  type="radio" name="type" value="HD">
+          <label for="videoAspect" class="form-label">Portrait</label>
+          <input class="mxy-6"  type="radio" name="aspect" value="Portait">
           <br>
 
-          <label for="videoPathInput" class="form-label">360 (4K)</label>
-          <input class="mxy-6"  type="radio" name="type" value="360">
+          <label for="videoAspect" class="form-label">Square</label>
+          <input class="mxy-6"  type="radio" name="aspect" value="Square">
           <br>
-          <label for="videoPathInput" class="form-label">Enter Path to Local Video to Encode</label>
+          <!-- <label for="videoAspect" class="form-label">Enter Path to Local Video to Encode</label>
+          <input class="form-control" type="text" id="videoPathInput"> -->
+
+        <div>
+        <label for="videoPathInput" class="form-label">Enter Path to Local Video to Encode</label>
           <input class="form-control" type="text" id="videoPathInput">
-
-          <div>
             <button id="videoLocalPathSubmitButton" type="submit" class="btn btn-sm btn-outline-secondary">Submit</button>
           </div>
         </form>

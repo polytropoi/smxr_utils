@@ -1137,6 +1137,102 @@ app.post("/authreq", function (req, res) {
         }
     })();
 });
+
+
+
+const ffmpegPromise_HLS_Landscape = (inputPath, outputPath) => {
+    return new Promise((resolve, reject) => {
+    //   ffmpeg(inputPath)
+    //     .output(outputPath)
+    let savepath = outputPath + 'output.m3u8'; //local
+        ffmpeg(inputPath)
+            .setFfmpegPath(ffmpeg_static)
+            // var proc = ffmpeg('rtmp://path/to/live/stream', { timeout: 432000 })
+            .output(savepath)
+            .outputOptions([
+              // '-codec: copy',
+              '-hls_time 5',
+              '-hls_list_size 0',
+              '-hls_playlist_type vod',
+              // '-hls_base_url http://localhost:8080/',
+              '-hls_segment_filename '+ outputPath +'%03d.ts'
+            ])
+            // set video bitrate
+            .videoBitrate(5000) //compromise
+            // set h264 preset
+            // .addOption('preset','superfast')
+            // set target codec
+            .videoCodec('libx264')
+            // set audio bitrate
+            // .audioCodec('libfdk_aac')
+            .audioBitrate('128k')
+            // set audio codec
+            // .audioCodec('libmp3lame')
+            // set number of audio channels
+            .audioChannels(2)
+            .withSize('1920x1080') //4k equirect
+            // set hls segments time
+            // .addOption('-hls_time', 10)
+            // // include all the segments in the list
+            // .addOption('-hls_list_size',0)
+            // setup event handlers
+            .on('end', () => resolve(outputPath))
+            .on('progress', (progress) => {
+                console.log(`Frame: ${progress.frames} - Time: ${progress.timemark}`);
+            })
+            .on('error', (err) => reject(new Error(`FFmpeg failed: ${err.message}`)))
+            .run();
+    });
+  }
+
+
+const ffmpegPromise_HLS_Portrait = (inputPath, outputPath) => {
+    console.log("tryna encode a portrait from " + inputPath);
+    return new Promise((resolve, reject) => {
+    //   ffmpeg(inputPath)
+    //     .output(outputPath)
+    let savepath = outputPath + 'output.m3u8'; //local
+        ffmpeg(inputPath)
+            .setFfmpegPath(ffmpeg_static)
+            // var proc = ffmpeg('rtmp://path/to/live/stream', { timeout: 432000 })
+            .output(savepath)
+            .outputOptions([
+              // '-codec: copy',
+              '-hls_time 5',
+              '-hls_list_size 0',
+              '-hls_playlist_type vod',
+              // '-hls_base_url http://localhost:8080/',
+              '-hls_segment_filename '+ outputPath +'%03d.ts'
+            ])
+            // set video bitrate
+            .videoBitrate(5000) //compromise
+            // set h264 preset
+            // .addOption('preset','superfast')
+            // set target codec
+            .videoCodec('libx264')
+            // set audio bitrate
+            // .audioCodec('libfdk_aac')
+            .audioBitrate('128k')
+            // set audio codec
+            // .audioCodec('libmp3lame')
+            // set number of audio channels
+            .audioChannels(2)
+            .withSize('1080x1920') //4k equirect
+            // set hls segments time
+            // .addOption('-hls_time', 10)
+            // // include all the segments in the list
+            // .addOption('-hls_list_size',0)
+            // setup event handlers
+            .on('end', () => resolve(outputPath))
+            .on('progress', (progress) => {
+                console.log(`Frame: ${progress.frames} - Time: ${progress.timemark}`);
+            })
+            .on('error', (err) => reject(new Error(`FFmpeg failed: ${err.message}`)))
+            .run();
+    });
+  }
+
+  
    
 const ffmpegPromise_hls360 = (inputPath, outputPath) => {
     return new Promise((resolve, reject) => {
@@ -1183,23 +1279,35 @@ const ffmpegPromise_hls360 = (inputPath, outputPath) => {
     });
   }
 
-  async function exists(f) {
-    try {
-      await fs.promises.stat(f);
-      return true;
-    } catch {
-      return false;
-    }
-  }  
+  
+//   async function exists(f) {
+//     try {
+//       await fs.promises.stat(f);
+//       return true;
+//     } catch {
+//       return false;
+//     }
+//   }  
+
+  async function checkFileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 
 app.post('/process_video_hls_local', requiredAuthentication, function (req, res) {
     let fullpath = req.body.fullpath;
+    let aspect = req.body.aspect;
 
-   console.log("tryna encode local file " + req.body.fullpath); 
+   console.log("tryna encode local file " + req.body.fullpath +" with aspect " + aspect); 
     (async () => {
         try {
             if (!busy) {    
-                const fileExists = await exists(fullpath);
+                const fileExists = await checkFileExists(fullpath);
                 if (!fileExists){
                     console.log("that file doesn't exist!");   
                 }//exists is deprecated, existSync doesn't work w/ promise version..
@@ -1211,7 +1319,7 @@ app.post('/process_video_hls_local', requiredAuthentication, function (req, res)
                     let downloadpath = path.dirname(fullpath) + "/";  //set local folder
                     let filename = path.basename(fullpath); // set local filename (*.mp4)                
                     
-                    var stats = fs.stat(fullpath)
+                    var stats = await fs.stat(fullpath)
                     var fileSizeInBytes = stats.size;
                     // Convert the file size to megabytes (optional)
                     var fileSizeInMegabytes = fileSizeInBytes / (1024 * 1024);
@@ -1228,11 +1336,21 @@ app.post('/process_video_hls_local', requiredAuthentication, function (req, res)
                     //insert vid first to get the id used for paths below
                     console.log("tryna save hls to " + downloadpath + " filename " + filename + " size " + fileSizeInMegabytes );
                     
-                    const response = await ffmpegPromise_hls360(fullpath, downloadpath);
-                    console.log("hls encoding result " +JSON.stringify(response));
+                    if (aspect == "360") {
+                        const response = await ffmpegPromise_hls360(fullpath, downloadpath); //4096 x 2048
+                        console.log("hls 360 encoding result " +JSON.stringify(response));
 
+                    } else if (aspect == "Landscape") {
+                       const response = await ffmpegPromise_HLS_Landscape(fullpath, downloadpath); //1920 x 1080
+                        console.log("hls Landscape encoding result " +JSON.stringify(response));
+                    } else if (aspect == "Portrait") {
+                    const response = await ffmpegPromise_HLS_Portrait(fullpath, downloadpath); //1080 x 1920
+                        console.log("hls portrait encoding result " +JSON.stringify(response));
+                    }
+                    
                     const video_item = await RunDataQuery("video_items", "insertOne", updoc);
-                    console.log("inserted video item, uploading next...")
+                    console.log("inserted video item, uploading next...");
+                    
                     const files = await fs.readdir(downloadpath);
                     for (const file of files) {
                         console.log("tryna read file " + downloadpath + file);
