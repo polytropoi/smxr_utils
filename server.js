@@ -1594,13 +1594,14 @@ app.get('/mongodump_from_cloud/', requiredAuthentication, function (req, res) {
         // }
         dumping = true;
         // const outputDir = '~/stump/data/dump'; // Directory to save the dump
+        const ts = Date.now();
 
         const args = [
             // '--host', dbhost,
             // '--port', dbport,
             // '--db', dbname,
             '--uri', process.env.MONGODUMP_FROM,
-            '--out', process.env.BACKUP_PATH,
+            '--out', process.env.BACKUP_PATH + "/" + ts,
             // '--username', username,
             // '--password', password
         ];
