@@ -1527,9 +1527,9 @@ app.get('/process_audio_download/:_id', requiredAuthentication, function (req, r
     console.log("tryna process audio : " + req.params._id);
     if (process.env.LOCAL_TEMP_FOLDER && process.env.LOCAL_TEMP_FOLDER != "") {
         (async () => {
-            if (!busy) {    
+            // if (!busy) {    
                 try {
-                    busy = true;
+                    // busy = true;
                     const o_id = ObjectId.createFromHexString(req.params._id);
                     const query = {"_id": o_id};
                     let audio_item = await RunDataQuery("audio_items", "findOne", query);
@@ -1560,18 +1560,18 @@ app.get('/process_audio_download/:_id', requiredAuthentication, function (req, r
                     fs.unlink(process.env.LOCAL_TEMP_FOLDER + "/" + audio_item._id + '.tmp.png');
                     fs.unlink(downloadpath + "/" + filename);
 
-                    busy = false;
+                    // busy = false;
                     console.log("processed and uploaded");
                     res.send("processed and uploading..");
 
                 } catch (e) {
-                    busy = false;
+                    // busy = false;
                     console.log("error processing audio files " + e);
                     res.send("error processing audio files " + e);
                 }
-            } else {
-                console.log("busy with audio processing, give us a shake...");
-            }
+            // } else {
+            //     console.log("busy with audio processing, give us a shake...");
+            // }
         })();
     } else {
         console.log("no temp folder found!");
