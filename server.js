@@ -2687,473 +2687,6 @@ app.get('/copyscenes/:domain/:shortid', requiredAuthentication, function (req, r
 });
 
 
-// let copyingScene = false;
-// app.get('/copyscene/:_id', requiredAuthentication, function (req, res) { //single scene
-
-//     if (!copyingScene) {
-//         copyingScene = true;
-
-//         (async () => {
-
-//             try {
-//         //
-//                 const sceneQuery = {'short_id': req.params._id};
-//                 let sceneData = await RunDataQuery("scenes", "findOne", sceneQuery, null);
-                            
-//                 if (sceneData.sceneObjects != null && sceneData.sceneObjects.length > 0) { //tryna get models - objects can have models and actions, and actions can have objects that can have models (and other actions!)
-//                     const o_ids = sceneData.sceneObjects.map(convertStringToObjectID);
-//                     console.log("models " + sceneData.sceneObjects + "model ids " + o_ids);
-//                     const objectsquery = {"_id": {$in: o_ids}};
-//                     let objects = await RunDataQuery("obj_items", "find", objectsquery);
-//                     let model_ids = [];
-//                     for (let object of objects) {
-//                         console.log("object " + object.name);
-//                         if (object.modelID) {
-//                             //  var m_id = ObjectId.createFromHexString(object.modelID);
-//                             //  const 
-//                             model_ids.push(object.modelID);
-//                             //  const modelquery 
-//                             //   let model = await RunDataQuery("models", "findOne", modelquery);
-//                         }
-//                         if (object.actionIDs != null) {
-//                             console.log("action ids " + object.actionIDs);
-//                             const action_ids = object.actionIDs.map(convertStringToObjectID);
-//                             // const actionsquery = {"_id": {$in: object.actionIDs}};
-//                             const actionsquery = {"_id": {$in: action_ids}};
-//                             let actions = await RunDataQuery("actions", "find", actionsquery);
-//                             console.log("object actions " + JSON.stringify(actions));
-//                             // for (let action of actions) {
-//                             for (let i = 0; i < actions.length; i++) {
-//                                 // if (action && action.objectID) {
-//                                     console.log("tryna get action object ID " + actions[i].objectID);
-//                                     // action.objectID = action.objectID;
-//                                     // if (ObjectId.isValid(actions[i].objectID)) { //maybe empty?
-//                                         // 
-//                                         // const oid = new ObjectId(action.objectID);
-//                                         // console.log("oid is " + oid);
-//                                         // const aoquery = {"_id": oid};
-//                                 if (actions[i].objectID != null && actions[i].objectID != undefined && ObjectId.isValid(actions[i].objectID.toString())) {
-//                                     // const oid = ObjectId.createFromHexString(actions[i].objectID);
-//                                     const aoquery = {"_id": actions[i].objectID};
-//                                     const aobject = await RunDataQuery("obj_items", "findOne", aoquery); //check for models attached to objects attached to actions attached to objects
-//                                     console.log("action object " + JSON.stringify(aobject));
-//                                     if (aobject && aobject.modelID) {
-//                                         // model_ids.push(ObjectId.createFromHexString(aobject.modelID));
-//                                         model_ids.push(aobject.modelID);
-//                                         console.log(" action object model added " + aobject.modelName);
-//                                     }
-//                                 }
-//                                     // }
-//                                 // }
-//                             }
-//                         }
-                
-//                         console.log("object model ids " + model_ids);
-                
-//                         const modelsquery = {"_id": {$in: model_ids}};
-//                         let models = await RunDataQuery("models", "find", modelsquery);
-//                         for (let model of models) {
-
-//                             let modelkey = "users/" + model.userID + "/gltf/" + model.filename;
-//                             if (model.item_type == "splat") {
-//                                 modelkey = "users/" + model.userID + "/splat/" + model.filename;
-//                             }
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, modelkey)) { //check the file is at aws
-//                                 if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, modelkey) == false) { //don't copy if it's already been copied
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, modelkey, process.env.ROOT_BUCKET_NAME, modelkey); //copy that stuff!
-//                                 } else {
-//                                     console.log(chalk.yellow("file already copied to minio " + modelkey))
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + modelkey));
-//                             }
-//                         }
-//                     }
-//                 }
-//                 if (sceneData.sceneModels != null && sceneData.sceneModels.length > 0) {
-
-//                     const m_ids = sceneData.sceneModels.map(convertStringToObjectID);
-                    
-//                     console.log("models " + sceneData.sceneModels + "model ids " + m_ids);
-//                     const modelsquery = {"_id": {$in: m_ids}};
-//                     let models = await RunDataQuery("models", "find", modelsquery);
-//                     for (let model of models) {
-//                         let modelkey = "users/" + model.userID + "/gltf/" + model.filename;
-//                         if (model.item_type == "splat") {
-//                             modelkey = "users/" + model.userID + "/splat/" + model.filename;
-//                         }
-//                         if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, modelkey)) { //check the file is at aws
-//                             if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, modelkey) == false) { //don't copy if it's already been copied
-//                                 await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, modelkey, process.env.ROOT_BUCKET_NAME, modelkey); //copy that stuff!
-//                             } else {
-//                                 console.log(chalk.yellow("file already copied to minio " + modelkey))
-//                             }
-//                         } else {
-//                             console.log(chalk.magenta("object not found at AWS " + modelkey));
-//                         }
-//                     }
-//                 }
-//                 if (sceneData.scenePictures != null && sceneData.scenePictures.length > 0) {
-//                     // sceneData.scenePictures.forEach(function (picture) {
-//                     for (let i = 0; i < sceneData.scenePictures.length; i++) {
-//                         console.log("tryna copy a picture " + sceneData.scenePictures[i]);
-//                         var p_id = ObjectId.createFromHexString(sceneData.scenePictures[i]); //convert to binary to search by _id beloiw
-//                         // requestedPictureItems.push(p_id); //populate array
-//                         const picquery = {_id: p_id};
-//                         const picture_item = await RunDataQuery("image_items", "findOne", picquery);
-//                         if (picture_item) {
-            
-//                             console.log("gotsa picture " + picture_item.filename);
-//                             var thumbName = 'thumb.' + picture_item.filename;
-//                             var quarterName = 'quarter.' + picture_item.filename;
-//                             var halfName = 'half.' + picture_item.filename;
-//                             var standardName = 'standard.' + picture_item.filename;
-//                             var originalName = 'original.' + picture_item.filename;
-//                             const thumbkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + thumbName;
-//                             // const quarterkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + thumbName;
-//                             const halfkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + halfName;
-//                             const standardkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + standardName;
-//                             const originalkeyold = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + originalName;
-//                             const originalkey = "users/" + picture_item.userID + "/pictures/originals/" + picture_item._id + "." + originalName;
-
-//                         if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //check the file is at aws
-//                                 if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey) == false) { //don't copy if it's already been copied
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, thumbkey, process.env.ROOT_BUCKET_NAME, thumbkey); //copy that stuff!
-//                                 } else {
-//                                     console.log(chalk.yellow("file already copied to minio " + thumbkey));
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + thumbkey));
-//                             }
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
-//                                 if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, halfkey) == false) {
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, halfkey, process.env.ROOT_BUCKET_NAME, halfkey);
-//                                 } else {
-//                                     console.log(chalk.yellow("file already copied to minio " + halfkey));
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + halfkey));
-//                             }
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
-//                                 if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, standardkey) == false) {
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, standardkey, process.env.ROOT_BUCKET_NAME, standardkey);
-//                                 } else {
-//                                     console.log(chalk.yellow("file already copied to minio " + standardkey))
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + standardkey));
-//                             }
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkeyold)) {
-//                                 if (await ReturnMinioObjectExists(rpocess.env.ROOT_BUCKET_NAME, originalkeyold) == false) {
-//                                 await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkeyold, process.env.ROOT_BUCKET_NAME, originalkey);
-//                                 } else {
-//                                     console.log(chalk.yellow("file already copied to minio " + originalkey))
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + originalkeyold));
-//                             }
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkey)) {
-//                                 if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, originalkey)  == false) {
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkey, process.env.ROOT_BUCKET_NAME, originalkey);
-//                                 } else {
-//                                     console.log("file already copied to minio " + originalkey)
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + originalkey));
-//                             }
-                        
-                        
-                            
-//                         }
-//                     }
-//                 }
-//                 if (sceneData.scenePictureGroups != null && sceneData.scenePictureGroups.length > 0) {
-
-//                     let pg_ids = [];
-//                     console.log("tryna get picture groups " +  sceneData.scenePictureGroups + " is array " + Array.isArray(sceneData.scenePictureGroups));
-//                     if (Array.isArray(sceneData.scenePictureGroups)) { //sometimes it's not an array... !?!
-
-//                         pg_ids = sceneData.scenePictureGroups.map(convertStringToObjectID);
-//                     } else {
-//                         pg_ids.push(convertStringToObjectID(sceneData.scenePictureGroups));
-//                     }
-
-//                     const pgquery = {"_id": {$in : pg_ids}};
-
-//                     const groups = await RunDataQuery("groups", "find", pgquery);
-//                     // console.log("getting ")
-//                     for (let group of groups) { 
-//                         // let picGroup = {};
-//                         // picGroup._id = group._id;
-//                         // picGroup.name = group.name;
-//                         // picGroup.userID = group.userID;
-//                         let p_ids = [];
-//                         if (Array.isArray(group.items)) {
-//                             p_ids = group.items.map(convertStringToObjectID);
-//                         } else {
-//                             p_ids.push(ObjectId.createFromHexString(group.items.toString()));
-//                         }
-//                         // const p_ids = group.items; //.map(convertStringToObjectID);
-//                         console.log("about to get picgroup items : "+ p_ids.length);
-//                         const picquery = {"_id": {$in : p_ids}};
-//                         let images = await RunDataQuery("image_items", "find", picquery);
-                    
-//                         for (let picture_item of images) { //jack in a signed url for each
-//                             // console.log("gots a pic in pic group w/ image.orientation " + image.filename);
-//                             if (picture_item && picture_item.userID) {
-//                                 var thumbName = 'thumb.' + picture_item.filename;
-//                                 var halfName = 'half.' + picture_item.filename;
-//                                 var standardName = 'standard.' + picture_item.filename;
-//                                 var originalName = 'original.' + picture_item.filename;
-//                                 const thumbkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + thumbName;
-//                                 // const quarterkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + thumbName;
-//                                 const halfkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + halfName;
-//                                 const standardkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + standardName;
-//                                 const originalkeyold = "users/" + picture_item.userID + "/pictures/" + picture_item._id + "." + originalName;
-//                                 const originalkey = "users/" + picture_item.userID + "/pictures/originals/" + picture_item._id + "." + originalName;
-
-//                                 if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //check the file is at aws
-//                                     if (await !ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)  == false) { //don't copy if it's already been copied
-//                                         await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, thumbkey, process.env.ROOT_BUCKET_NAME, thumbkey); //copy that stuff!
-//                                     } else {
-//                                         console.log(chalk.yellow("file already copied to minio " + thumbkey));
-//                                     }
-//                                 } else {
-//                                     console.log(chalk.magenta("object not found at AWS " + thumbkey));
-//                                 }
-//                                 if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
-//                                     if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, halfkey) == false) {
-//                                         await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, halfkey, process.env.ROOT_BUCKET_NAME, halfkey);
-//                                     } else {
-//                                         console.log(chalk.yellow("file already copied to minio " + halfkey));
-//                                     }
-//                                 } else {
-//                                     console.log(chalk.magenta("object not found at AWS " + halfkey));
-//                                 }
-//                                 if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
-//                                     if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, standardkey) == false) {
-//                                         await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, standardkey, process.env.ROOT_BUCKET_NAME, standardkey);
-//                                     } else {
-//                                         console.log(chalk.yellow("file already copied to minio " + standardkey));
-//                                     }
-//                                 } else {
-//                                     console.log(chalk.magenta("object not found at AWS " + standardkey));
-//                                 }
-//                                 if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkeyold)) {
-//                                     if (await ReturnMinioObjectExists(rpocess.env.ROOT_BUCKET_NAME, originalkeyold) == false) {
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkeyold, process.env.ROOT_BUCKET_NAME, originalkey);
-//                                     } else {
-//                                         console.log(chalk.yellow("file already copied to minio " + originalkeyold));
-//                                     }
-//                                 } else {
-//                                     // console.log(chalk.magenta("object not found at AWS " + originalkeyold);
-//                                 }
-//                                 if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, originalkey)) {
-//                                     if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, originalkey) == false) {
-//                                         await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, originalkey, process.env.ROOT_BUCKET_NAME, originalkey);
-//                                     } else {
-//                                         console.log(chalk.yellow("file already copied to minio " + originalkey));
-//                                     }
-//                                 } else {
-//                                     console.log(chalk.magenta("object not found at AWS " + originalkey));
-//                                 }
-
-//                             }
-//                         }
-//                     }
-//                 }
-//                 if (sceneData.scenePostcards != null && sceneData.scenePostcards.length > 0) {
-                    
-//                     // const postcardID = sceneData.scenePostcards[0]; //whatever, just one for now
-//                     console.log("gots postcards " + sceneData.scenePostcards);
-//                     for (let i = 0; i < sceneData.scenePostcards.length; i++) {
-                    
-//                         console.log("gots postcards " + sceneData.scenePostcards);
-//                         const p_id = convertStringToObjectID(sceneData.scenePostcards[i]);
-//                         const picturequery = {"_id": p_id};
-//                         const picture_item = await RunDataQuery("image_items", "findOne", picturequery);
-//                         if (picture_item != null && picture_item.userID) {
-                            
-//                             const thumbkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + ".thumb." + picture_item.filename;
-//                             const halfkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + ".half." + picture_item.filename;
-//                             const standardkey = "users/" + picture_item.userID + "/pictures/" + picture_item._id + ".standard." + picture_item.filename;
-
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey)) { //check the file is at aws
-//                                     if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, thumbkey) == false) { //don't copy if it's already been copied
-//                                         await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, thumbkey, process.env.ROOT_BUCKET_NAME, thumbkey); //copy that stuff!
-//                                     } else {
-//                                         console.log(chalk.yellow("file already copied to minio " + thumbkey))
-//                                     }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + thumbkey));
-//                             }
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, halfkey)) {
-//                                 if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, halfkey) == false) {
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, halfkey, process.env.ROOT_BUCKET_NAME, halfkey);
-//                                 } else {
-//                                     console.log(chalk.yellow("file already copied to minio " + halfkey))
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + halfkey));
-//                             }
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, standardkey)) {
-//                                 if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, standardkey) == false) {
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, standardkey, process.env.ROOT_BUCKET_NAME, standardkey);
-//                                 } else {
-//                                     console.log(chalk.yellow("file already copied to minio " + standardkey))
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + standardkey));
-//                             }
-//                         }
-                                            
-//                     }
-//                 }
-//                 var triggerOID = ObjectId.isValid(sceneData.sceneTriggerAudioID) ? ObjectId.createFromHexString(sceneData.sceneTriggerAudioID) : "";
-//                 var ambientOID = ObjectId.isValid(sceneData.sceneAmbientAudioID) ? ObjectId.createFromHexString(sceneData.sceneAmbientAudioID) : "";
-//                 var primaryOID = ObjectId.isValid(sceneData.scenePrimaryAudioID) ? ObjectId.createFromHexString(sceneData.scenePrimaryAudioID) : "";
-//                 let requestedAudioItems = [ triggerOID, ambientOID, primaryOID];
-
-//                 let audioGroups = [];
-//                 if (sceneData.sceneTriggerAudioGroups != null && sceneData.sceneTriggerAudioGroups != undefined) {
-//                     if (!Array.isArray(sceneData.sceneTriggerAudioGroups)) {
-//                         sceneData.sceneTriggerAudioGroups = [sceneData.sceneTriggerAudioGroups];    
-//                     }
-//                     audioGroups.push(...sceneData.sceneTriggerAudioGroups);
-//                 }
-//                 if (sceneData.sceneAmbientAudioGroups != null && sceneData.sceneAmbientAudioGroups != undefined) {
-//                     audioGroups.push(...sceneData.sceneAmbientAudioGroups);
-//                 }
-//                 if (sceneData.scenePrimaryAudioGroups != null && sceneData.scenePrimaryAudioGroups != undefined) {
-//                     audioGroups.push(...sceneData.scenePrimaryAudioGroups);
-//                 }
-//                 // audioGroups.push(...sceneData.sceneAmbientAudioGroups);
-//                 // audioGroups.push(...sceneData.scenePrimaryAudioGroups);
-
-//                 const a_ids = audioGroups.map(convertStringToObjectID);
-//                 console.log("audioGroups " + audioGroups);
-//                 if (audioGroups.length) {
-                    
-//                     const groupsquery = {"_id": {$in: a_ids}};
-//                     let agroups = await RunDataQuery("groups", "find", groupsquery);
-//                     for (let group of agroups) {
-//                         let p_ids = [];
-//                         if (Array.isArray(group.items)) {
-//                             p_ids = group.items.map(convertStringToObjectID);
-//                         } else {
-//                             p_ids.push(ObjectId.createFromHexString(group.items.toString()));
-//                         }
-//                         requestedAudioItems.push(...p_ids); //spread operator, yes
-//                     }
-//                 }
-            
-
-//                 console.log("requested audio items all together " + requestedAudioItems);
-//                 const audioquery = {"_id": {$in: requestedAudioItems }};
-//                 let audio_items = await RunDataQuery("audio_items", "find", audioquery);
-
-//                 for (var i = 0; i < audio_items.length; i++) {
-
-//                     console.log("audio_item: ", audio_items[i].filename);
-//                     var item_string_filename = JSON.stringify(audio_items[i].filename);
-//                     item_string_filename = item_string_filename.replace(/\"/g, "");
-//                     var item_string_filename_ext = getExtension(item_string_filename);
-//                     var expiration = new Date();
-//                     expiration.setMinutes(expiration.getMinutes() + 1000);
-//                     var baseName = path.basename(item_string_filename, (item_string_filename_ext));
-//                     var mp3Name = "users/" + audio_items[i].userID + "/audio/" + audio_items[i]._id + "." + baseName + '.mp3';
-//                     var oggName = "users/" + audio_items[i].userID + "/audio/" + audio_items[i]._id + "." + baseName + '.ogg';
-//                     var pngName = "users/" + audio_items[i].userID + "/audio/" + audio_items[i]._id + "." + baseName + '.png';
-
-
-//                     if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, mp3Name)) {
-//                         if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, mp3Name) == false) { 
-//                             await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, mp3Name, process.env.ROOT_BUCKET_NAME, mp3Name);
-//                         } else {
-//                             console.log("file already copied to minio " + mp3Name);
-//                         }
-//                     } else {
-//                         console.log(chalk.magenta("object not found at AWS " + mp3Name));
-//                     }
-//                     if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, oggName)) {
-//                         if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, oggName)  == false) { 
-//                         await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, oggName, process.env.ROOT_BUCKET_NAME, oggName);
-//                         } else {
-//                             console.log("file already copied to minio " + oggName);
-//                         }
-//                     } else {
-//                         console.log(chalk.magenta("object not found at AWS " + oggName));
-//                     }
-//                     if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, pngName)) {
-//                         if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, pngName) == false) { 
-//                             await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, mp3Name, process.env.ROOT_BUCKET_NAME, pngName);
-//                         } else {
-//                             console.log("file already copied to minio " + pngName);
-//                         }
-//                     } else {
-//                         console.log(chalk.magenta("object not found at AWS " + pngName));
-//                     }
-
-//                 }
-            
-
-//                 if (sceneData.sceneVideoGroups != null && sceneData.sceneVideoGroups.length > 0) {
-//                     console.log("tryna get video groups " +  sceneData.sceneVideoGroups);
-//                     const vidgroups_ids = sceneData.sceneVideoGroups.map(convertStringToObjectID);
-//                     // const vidgroupsquery = {"_id": {$in : sceneData.sceneVideoGroups}};
-//                     const vidgroupsquery = {"_id": {$in : vidgroups_ids}};
-//                     const groups = await RunDataQuery("groups", "find", vidgroupsquery);
-//                     for (let group of groups) { 
-                        
-//                         let vid_ids = [];
-//                         if (Array.isArray(group.items)) {
-//                             vid_ids = group.items.map(convertStringToObjectID);
-//                         } else {
-//                             vid_ids.push(ObjectId.createFromHexString(group.items.toString()));
-//                         }
-//                         // const p_ids = group.items; //.map(convertStringToObjectID);
-//                         console.log("about to get vidgroup items : "+ vid_ids.length);
-//                         const vidsquery = {"_id": {$in : vid_ids}};
-//                         let videos = await RunDataQuery("video_items", "find", vidsquery);
-                    
-//                         for (let video of videos) { //jack in a signed url for each
-                            
-//                             const vidkey = 'users/' + video.userID + '/video/' + video._id + '/' + video._id + '.' + video.filename;
-//                             console.log("gotsa video " + vidkey);
-//                             if (await ReturnObjectExists(process.env.ROOT_BUCKET_NAME, vidkey)) {
-//                                 if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, vidkey) == false) { 
-//                                     await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, vidkey, process.env.ROOT_BUCKET_NAME, vidkey);
-//                                     //now get the hls encoded files, if any...
-//                                     const hlsFiles = await ListObjects(process.env.ROOT_BUCKET_NAME, 'users/' + video.userID + '/video/' + video._id + '/hls/' );
-//                                     // console.log(JSON.stringify(hlsFiles.Contents));
-//                                     for (let i = 0; i < hlsFiles.Contents.length; i++) {
-//                                         if (await ReturnMinioObjectExists(process.env.ROOT_BUCKET_NAME, hlsFiles.Contents[i].Key) == false) { 
-//                                             await CopyObjectAWStoMinio(process.env.ROOT_BUCKET_NAME, hlsFiles.Contents[i].Key, process.env.ROOT_BUCKET_NAME, hlsFiles.Contents[i].Key); 
-//                                         }
-//                                     }
-//                                 } else {
-//                                     console.log("file already copied to minio " + vidkey);
-//                                 }
-//                             } else {
-//                                 console.log(chalk.magenta("object not found at AWS " + vidkey));
-//                             }
-
-//                         }
-//                     }
-//                 }
-            
-              
-//                 copyingScene = false;
-//                 res.redirect("/main");
-//             } catch (e) {
-//                 console.log("error copying " + e);
-//                 res.send("error copying scene " + e);
-//                 copyingScene = false;
-//             }
-            
-//         })();
-//     }
-// });
 
 function toCSV(json) {
   json = Object.values(json);
@@ -3165,3 +2698,113 @@ function toCSV(json) {
   }
   return csv;
 }
+
+/////////////////////// take live HLS stream from local OBS and push it to the live s3 bucket, rolling over / updating segments and manifest
+
+
+const BUCKET_NAME = 'servicemedia.net';
+const S3_FOLDER = 'live/stream1'; // Destination folder prefix in S3
+const LOCAL_WATCH_DIR = path.join(process.cwd(), 'output');
+
+// Track uploaded segments so we know what to prune
+let activeS3Segments = new Set();
+
+/**
+ * Helper to upload a file to S3 with correct content-type
+ */
+async function uploadToS3(localFilePath, s3Key) {
+  const ext = path.extname(localFilePath);
+  // Important: Browsers and players strictly check Content-Type headers
+  const contentType = ext === '.m3u8' ? 'application/x-mpegURL' : 'video/MP2T';
+
+  try {
+    const fileBuffer = fs.readFileSync(localFilePath);
+    await S3Client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: s3Key,
+        Body: fileBuffer,
+        ContentType: contentType,
+        // Cache-Control is critical: Manifests must NEVER cache; Chunks can cache forever
+        CacheControl: ext === '.m3u8' ? 'max-age=0, no-cache, no-store, must-revalidate' : 'public, max-age=31536000',
+      })
+    );
+    console.log(`Successfully uploaded: ${s3Key}`);
+  } catch (error) {
+    console.error(`Failed to upload ${s3Key}:`, error);
+  }
+}
+
+/**
+ * Parses the rolling .m3u8 file to check which segments are currently active
+ */
+function parseActiveSegments(manifestPath) {
+  try {
+    const content = fs.readFileSync(manifestPath, 'utf-8');
+    const lines = content.split('\n');
+    // Extract lines ending with .ts
+    return lines
+      .map(line => line.trim())
+      .filter(line => line.endsWith('.ts'));
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Handles deletions of rolled-over segments
+ */
+async function handleManifestRollover(manifestPath) {
+  const currentSegments = parseActiveSegments(manifestPath);
+  
+  // Find segments that exist in S3 but are no longer in the .m3u8 file
+  for (const savedSegment of activeS3Segments) {
+    if (!currentSegments.includes(savedSegment)) {
+      const s3Key = `${S3_FOLDER}/${savedSegment}`;
+      try {
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: s3Key,
+          })
+        );
+        activeS3Segments.delete(savedSegment);
+        console.log(`Rolled over & deleted from S3: ${s3Key}`);
+      } catch (err) {
+        console.error(`Failed to delete expired chunk ${s3Key}:`, err);
+      }
+    }
+  }
+}
+
+// 2. Initialize Directory Watcher
+console.log(`Watching local directory: ${LOCAL_WATCH_DIR}`);
+const watcher = chokidar.watch(LOCAL_WATCH_DIR, {
+  persistent: true,
+  ignoreInitial: true,
+  awaitWriteFinish: {
+    stabilityThreshold: 300,
+    pollInterval: 100
+  }
+});
+
+watcher.on('all', async (event, filePath) => {
+  const fileName = path.basename(filePath);
+  const s3Key = `${S3_FOLDER}/${fileName}`;
+
+  // If a new .ts segment is created
+  if ((event === 'add' || event === 'change') && fileName.endsWith('.ts')) {
+    activeS3Segments.add(fileName);
+    await uploadToS3(filePath, s3Key);
+    
+    // Clean up local disk so server storage doesn't fill up
+    fs.unlink(filePath, (err) => { if (err) console.error(err); });
+  }
+
+  // If the manifest rolls over/updates
+  if ((event === 'add' || event === 'change') && fileName.endsWith('.m3u8')) {
+    // Process manifest pruning before replacing the live playlist index file
+    await handleManifestRollover(filePath);
+    await uploadToS3(filePath, s3Key);
+  }
+});
